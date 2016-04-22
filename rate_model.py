@@ -9,6 +9,7 @@ class Model(object):
       """
       The model class. Essential a container of sheets, that makes sure the all update their vm and activities correctly.
       
+      All time variables are in miliseconds!
       
       """
       def __init__(self, sheets, dt):
@@ -93,6 +94,8 @@ class Sheet(object):
         
     def update(self):
         assert self.buffer_index < self.buffer_depth
+        assert not self.not_initialized
+        
         self.activities[self.buffer_index]*=0
         
         # sum the activity comming from all projections
@@ -109,6 +112,31 @@ class Sheet(object):
         #once all done, advance our buffer depth
         self.buffer_index = (self.buffer_index + 1) % self.buffer_depth
         
+     def reset(self):
+        """
+        Resets the sheet to be in the same state as after initialization (including he call to _initialize).
+        """
+        
+class InputSheet(Sheet):
+    """
+    Sheet for which you can set input. It cannot have any incomming connections.
+    
+    For now only time invariant input can be set.
+    """
+    
+    def _register_projection(self,projection):
+        """
+        Registers projection as one of the input projection to the sheet.
+        """
+        raise Error, "Input sheet cannot accept incomming projections."
+    
+    def set_activity(self,activity):
+        assert size(activity) == size(self.activities[0])
+        for i in xrange(0,self.buffer_depth):
+            self.activities[i] = activity
+    
+    def update():
+        pass
 
 class Projection(object):    
     """
