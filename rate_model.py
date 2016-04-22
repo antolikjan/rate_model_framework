@@ -99,9 +99,8 @@ class Sheet(object):
         for p in self.in_projections:
             self.activities[self.buffer_index] += p.activate()
         
-        # CORRERCET DSAD!~!!!!!!!! WROOOOONG    
         #make the dt step 
-        self.activities[self.buffer_index] = self.activities[self.buffer_index-1] + self.activities[self.buffer_index]/self.dt
+        self.activities[self.buffer_index] = self.activities[self.buffer_index-1] + self.dt*(-self.activities[self.buffer_index-1]+self.activities[self.buffer_index])/self.time_constant
         
         #applt the non-linearity    
         self.activities[self.buffer_index] = self.activities[self.buffer_index].clip(min=self.threshold)
