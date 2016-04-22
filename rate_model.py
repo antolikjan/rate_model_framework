@@ -7,7 +7,7 @@ import scipy
 
 class Model(object):
       """
-      The model class. Essential a container of sheets, that makes sure the all update their vm and activities correctly.
+      The model class. Essentially a container of sheets, that makes sure the all update their vm and activities correctly.
       
       All time variables are in miliseconds!
       
@@ -52,7 +52,7 @@ class Sheet(object):
         Parameters
         ----------
         radius : int
-                 The radious of the sheet in units. Thus the sheet will have radius*2 x radius*2 units.
+                 The radius of the sheet in units. Thus the sheet will have radius*2 x radius*2 units.
         
         threshold : float
                   The threshold of the units in the sheet.
@@ -96,6 +96,7 @@ class Sheet(object):
         assert self.buffer_index < self.buffer_depth
         assert not self.not_initialized
         
+        #delete new activities    
         self.activities[self.buffer_index]*=0
         
         # sum the activity comming from all projections
@@ -103,10 +104,10 @@ class Sheet(object):
             self.activities[self.buffer_index] += p.activate()
         
         #make the dt step 
-        self.activities[self.buffer_index] = self.activities[self.buffer_index-1] + self.dt*(-self.activities[self.buffer_index-1]+self.activities[self.buffer_index])/self.time_constant
+        self.vm = self.vm + self.dt*(-self.vm+self.activities[self.buffer_index])/self.time_constant
         
-        #applt the non-linearity    
-        self.activities[self.buffer_index] = self.activities[self.buffer_index].clip(min=self.threshold)
+        #apply the non-linearity    
+        self.activities[self.buffer_index] = self.vm.clip(min=self.threshold)
         
         #once all done, advance our buffer depth
         self.buffer_index = (self.buffer_index + 1) % self.buffer_depth
@@ -115,6 +116,10 @@ class Sheet(object):
         """
         Resets the sheet to be in the same state as after initialization (including he call to _initialize).
         """
+        self.activities *= 0
+        self.buffer_index = 0
+        self.vm *= 0
+        
         
 class InputSheet(Sheet):
     """
