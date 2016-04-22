@@ -23,16 +23,28 @@ class Model(object):
                  The time step of the simulation
           """
           self.sheets = sheets
+          self.dt = dt
+          # find maximum delay 
           
-          # determine the buffer depth by finding the longest delay
-          
+          # initialize sheets
+          for s in sheets:
+              # find maximum delay from that sheet
+              max_delay = max([p.delay for p in s.out_projections])
+              s._initialize(numpy.ceil(max_delay/dt),self.dt)
       
-      def run(self,number_of_step):
-          for i in xrange(0,number_of_step):
+      def run(self,time):
+          assert time % self.dt == 0, "You can only run the network for times that are multiples of dt"
+          
+          for i in xrange(0,numpy.round(time/self.dt)):
               for s in sheets:
-                  s.update_vm()
+                  for p in s.in_projections:
+                      p.activate()
+                
               for s in sheets:
-                  s.update_activities()
+                  s.update()
+          
+          print("Ran network for " + time + "ms")
+         
                     
       
     
@@ -57,15 +69,16 @@ class Sheet(object):
         threshold : float
                   The threshold of the units in the sheet.
         """
+        self.radius = radius
         self.vm = numpy.zeros((2*radius,2*radius))
         self.threshold = threshold
         self.in_projections = []
-        self.activity_buffer_index
-        self.time_constant
+        self.out_projections = []
+        self.time_constant = time_constant
         self.name = name
         self.not_initialized = True
     
-    def _initialize(self,steps,dt):
+    def _initialize(self,buffer_depth,dt):
         """
         Initializes sheet. Certain information is available onle once sheets are registered in the model.
         This is done here.
@@ -73,8 +86,8 @@ class Sheet(object):
         assert self.not_initialized, "Sheet "+ self.name + " has already been initialized"
         self.dt = dt
         self.buffer_index = 0
-        self.buffer_depth = steps
-        self.activities = numpy.zeros((steps,2*radius,2*radius))
+        self.buffer_depth = buffer_depth
+        self.activities = numpy.zeros((buffer_depth,2*self.radius,2*self.radius))
         self.not_initialized = False
 
     
@@ -82,15 +95,22 @@ class Sheet(object):
         """
         Return's sheet activity delay in the past (rounded to the nearest multiple of dt).
         """
-        index = round(delay/self.dt)
+        index = numpy.round(delay/self.dt)
         assert index < self.buffer_depth, "ERROR: Activity with delay longer thenn the depth of activity buffer requested."
         return self.activities[buffer_index-index]
     
-    def _register_projection(self,projection):
+    def _register_in_projection(self,projection):
         """
         Registers projection as one of the input projection to the sheet.
         """
         self.in_projections.append(projection)
+
+    def _register_out_projection(self,projection):
+        """
+        Registers projection as one of the output projections to the sheet.
+        """
+        self.out_projections.append(projection)
+    
         
     def update(self):
         assert self.buffer_index < self.buffer_depth
@@ -101,7 +121,7 @@ class Sheet(object):
         
         # sum the activity comming from all projections
         for p in self.in_projections:
-            self.activities[self.buffer_index] += p.activate()
+            self.activities[self.buffer_index] += p.activity
         
         #make the dt step 
         self.vm = self.vm + self.dt*(-self.vm+self.activities[self.buffer_index])/self.time_constant
@@ -112,7 +132,7 @@ class Sheet(object):
         #once all done, advance our buffer depth
         self.buffer_index = (self.buffer_index + 1) % self.buffer_depth
         
-     def reset(self):
+    def reset(self):
         """
         Resets the sheet to be in the same state as after initialization (including he call to _initialize).
         """
@@ -147,7 +167,7 @@ class Projection(object):
     A set of connections from one sheet to another. This is an abstract class.
     """
     
-    def __init__(self, name, source, target, strength):
+    def __init__(self, name, source, target, strength,delay):
         """
         Each Projection has a source sheet and target sheet.
         
@@ -170,7 +190,8 @@ class Projection(object):
         self.target = target
         self.strength = strength
         self.delay = delay
-        self.target._register_projection(self)
+        self.target._register_in_projection(self)
+        self.source._register_out_projection(self)
         
     
     def activate(self):
@@ -186,7 +207,7 @@ class ConvolutionalProjection(Projection):
     A projection which has only one set of connections (connection kernel) which are assumed to be the same for all target neurons, except being centered on their position.
     This means that the output of ConvolutionalProjection is the spatial convolution of this connection kernel with the activities of the source Sheet.
     """
-    def __init__(self,connection_kernel,source, target, strength):
+    def __init__(self,name,source, target, strength,delay,connection_kernel):
         """
         Each Projection has a source sheet and target sheet.
         
@@ -201,8 +222,9 @@ class ConvolutionalProjection(Projection):
         strength : float
                  The strength of the projection.
         """
-        Projection.__init__(self, source, target, strength)
+        Projection.__init__(self, name,source, target, strength,delay)
         self.connection_kernel = connection_kernel
+        
         
     
     def activate(self):
@@ -215,5 +237,5 @@ class ConvolutionalProjection(Projection):
         resp = scipy.signal.convolve2d(self.source.get_activity(self.delay),self.connection_kernel, mode='same')[size_diff:-size_diff,size_diff:-size_diff]
         assert size(resp) == (2*self.target.radius,2*self.target.radius)
         
-        return resp * self.strength
+        self.activity = resp * self.strength
         
