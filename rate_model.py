@@ -2,7 +2,7 @@
 # This is a simple framework for building rate-models with 2D geometry.             #
 #####################################################################################
 import numpy
-import scipy
+import scipy.signal
 
 
 class Model(object):
@@ -29,21 +29,22 @@ class Model(object):
           # initialize sheets
           for s in sheets:
               # find maximum delay from that sheet
-              max_delay = max([p.delay for p in s.out_projections])
+              max_delay = max([p.delay for p in s.out_projections]+[self.dt])
               s._initialize(numpy.ceil(max_delay/dt),self.dt)
       
       def run(self,time):
-          assert time % self.dt == 0, "You can only run the network for times that are multiples of dt"
+          # not exact but close enough
+          assert abs(time - int(numpy.round(time / self.dt))*self.dt) < 0.000000001*self.dt, "You can only run the network for times that are multiples of dt"
           
-          for i in xrange(0,numpy.round(time/self.dt)):
-              for s in sheets:
+          for i in xrange(0,int(numpy.round(time/self.dt))):
+              for s in self.sheets:
                   for p in s.in_projections:
                       p.activate()
                 
-              for s in sheets:
+              for s in self.sheets:
                   s.update()
           
-          print("Ran network for " + time + "ms")
+          print("Ran network for " + str(time) + "ms")
          
                     
       
@@ -91,13 +92,13 @@ class Sheet(object):
         self.not_initialized = False
 
     
-    def get_activity(delay):
+    def get_activity(self,delay):
         """
         Return's sheet activity delay in the past (rounded to the nearest multiple of dt).
         """
-        index = numpy.round(delay/self.dt)
+        index = numpy.round(delay/self.dt)-1
         assert index < self.buffer_depth, "ERROR: Activity with delay longer thenn the depth of activity buffer requested."
-        return self.activities[buffer_index-index]
+        return self.activities[self.buffer_index-index]
     
     def _register_in_projection(self,projection):
         """
@@ -159,7 +160,7 @@ class InputSheet(Sheet):
         for i in xrange(0,self.buffer_depth):
             self.activities[i] = activity
     
-    def update():
+    def update(self):
         pass
 
 class Projection(object):    
@@ -190,6 +191,7 @@ class Projection(object):
         self.target = target
         self.strength = strength
         self.delay = delay
+        assert delay > 0, "ERROR: zero delay projections are not allowed"
         self.target._register_in_projection(self)
         self.source._register_out_projection(self)
         
@@ -233,9 +235,10 @@ class ConvolutionalProjection(Projection):
         """
         size_diff = self.source.radius - self.target.radius
         assert size_diff >=0 , "ERROR: The radios of source sheet of ConvolutionalProjection has to be larger than target"
-        
-        resp = scipy.signal.convolve2d(self.source.get_activity(self.delay),self.connection_kernel, mode='same')[size_diff:-size_diff,size_diff:-size_diff]
-        assert size(resp) == (2*self.target.radius,2*self.target.radius)
-        
+        resp = scipy.signal.convolve2d(self.source.get_activity(self.delay),self.connection_kernel, mode='same')
+        if size_diff != 0:
+            resp = resp[size_diff:-size_diff,size_diff:-size_diff]
+        assert numpy.shape(resp) == (2*self.target.radius,2*self.target.radius), "ERROR: The size of calculated projection respone is " + str(numpy.shape(resp)) + "units, while the size of target sheet is " + str((2*self.target.radius,2*self.target.radius)) + " units"
+         
         self.activity = resp * self.strength
         
