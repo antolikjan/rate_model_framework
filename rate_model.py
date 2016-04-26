@@ -3,7 +3,7 @@
 #####################################################################################
 import numpy
 import scipy.signal
-
+import pylab
 
 class Model(object):
       """
@@ -30,7 +30,7 @@ class Model(object):
           for s in sheets:
               # find maximum delay from that sheet
               max_delay = max([p.delay for p in s.out_projections]+[self.dt])
-              s._initialize(numpy.ceil(max_delay/dt),self.dt)
+              s._initialize(int(numpy.ceil(max_delay/dt)),self.dt)
       
       def run(self,time):
           # not exact but close enough
@@ -97,8 +97,8 @@ class Sheet(object):
         Return's sheet activity delay in the past (rounded to the nearest multiple of dt).
         """
         index = numpy.round(delay/self.dt)-1
-        assert index < self.buffer_depth, "ERROR: Activity with delay longer thenn the depth of activity buffer requested."
-        return self.activities[self.buffer_index-index]
+        assert index < self.buffer_depth, "ERROR: Activity with delay longer then the depth of activity buffer requested."
+        return self.activities[(self.buffer_index-index) % self.buffer_depth]
     
     def _register_in_projection(self,projection):
         """
@@ -126,6 +126,12 @@ class Sheet(object):
         
         #make the dt step 
         self.vm = self.vm + self.dt*(-self.vm+self.activities[self.buffer_index])/self.time_constant
+        
+        #pylab.figure()
+        #pylab.imshow(self.vm,cmap='gray',interpolation=None)
+        #pylab.title('sheet')
+        #pylab.show()
+
         
         #apply the non-linearity    
         self.activities[self.buffer_index] = self.vm.clip(min=self.threshold)
@@ -156,7 +162,7 @@ class InputSheet(Sheet):
         raise Error, "Input sheet cannot accept incomming projections."
     
     def set_activity(self,activity):
-        assert size(activity) == size(self.activities[0])
+        assert numpy.shape(activity) == numpy.shape(self.activities[0])
         for i in xrange(0,self.buffer_depth):
             self.activities[i] = activity
     
@@ -194,6 +200,7 @@ class Projection(object):
         assert delay > 0, "ERROR: zero delay projections are not allowed"
         self.target._register_in_projection(self)
         self.source._register_out_projection(self)
+        self.activity = None
         
     
     def activate(self):
@@ -239,6 +246,6 @@ class ConvolutionalProjection(Projection):
         if size_diff != 0:
             resp = resp[size_diff:-size_diff,size_diff:-size_diff]
         assert numpy.shape(resp) == (2*self.target.radius,2*self.target.radius), "ERROR: The size of calculated projection respone is " + str(numpy.shape(resp)) + "units, while the size of target sheet is " + str((2*self.target.radius,2*self.target.radius)) + " units"
-         
+        
         self.activity = resp * self.strength
         
