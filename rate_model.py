@@ -4,12 +4,15 @@
 import numpy
 import scipy.signal
 import pylab
+from visualization import *
+
+#pylab.ion()
 
 class Model(object):
       """
       The model class. Essentially a container of sheets, that makes sure the all update their vm and activities correctly.
       
-      All time variables are in miliseconds!
+      All time variables are in seconds!
       
       """
       def __init__(self, sheets, dt):
@@ -24,27 +27,32 @@ class Model(object):
           """
           self.sheets = sheets
           self.dt = dt
-          # find maximum delay 
-          
-          # initialize sheets
+          self.time = 0
+
+          # find maximum delay and initialize sheets
           for s in sheets:
               # find maximum delay from that sheet
               max_delay = max([p.delay for p in s.out_projections]+[self.dt])
-              s._initialize(int(numpy.ceil(max_delay/dt)),self.dt)
+              s._initialize(int(numpy.ceil(max_delay/dt))+1,self.dt)
       
       def run(self,time):
           # not exact but close enough
           assert abs(time - int(numpy.round(time / self.dt))*self.dt) < 0.000000001*self.dt, "You can only run the network for times that are multiples of dt"
           
+          
           for i in xrange(0,int(numpy.round(time/self.dt))):
+              
               for s in self.sheets:
                   for p in s.in_projections:
                       p.activate()
                 
               for s in self.sheets:
                   s.update()
+              
+              self.time += self.dt
           
-          print("Ran network for " + str(time) + "ms")
+              
+          print("Ran network for " + str(time) + "seconds.")
          
                     
       
@@ -96,9 +104,9 @@ class Sheet(object):
         """
         Return's sheet activity delay in the past (rounded to the nearest multiple of dt).
         """
-        index = numpy.round(delay/self.dt)-1
-        assert index < self.buffer_depth, "ERROR: Activity with delay longer then the depth of activity buffer requested."
-        return self.activities[(self.buffer_index-index) % self.buffer_depth]
+        index = numpy.round(delay/self.dt)
+        assert index < self.buffer_depth, "ERROR: Activity with delay longer then the depth of activity buffer requested. " + str(self.buffer_depth) + ' ' + str(index)
+        return self.activities[(self.buffer_index-index-1) % self.buffer_depth]
     
     def _register_in_projection(self,projection):
         """
@@ -242,10 +250,65 @@ class ConvolutionalProjection(Projection):
         """
         size_diff = self.source.radius - self.target.radius
         assert size_diff >=0 , "ERROR: The radios of source sheet of ConvolutionalProjection has to be larger than target"
-        resp = scipy.signal.convolve2d(self.source.get_activity(self.delay),self.connection_kernel, mode='same')
+        resp = scipy.signal.fftconvolve(self.source.get_activity(self.delay),self.connection_kernel, mode='same')
         if size_diff != 0:
             resp = resp[size_diff:-size_diff,size_diff:-size_diff]
         assert numpy.shape(resp) == (2*self.target.radius,2*self.target.radius), "ERROR: The size of calculated projection respone is " + str(numpy.shape(resp)) + "units, while the size of target sheet is " + str((2*self.target.radius,2*self.target.radius)) + " units"
         
         self.activity = resp * self.strength
+
+
+
+class ConnetionFieldProjection(Projection):    
+    """
+    A projection which has only one set of connections (connection kernel) which are assumed to be the same for all target neurons, except being centered on their position.
+    This means that the output of ConvolutionalProjection is the spatial convolution of this connection kernel with the activities of the source Sheet.
+    """
+    def __init__(self,name,source, target, strength,delay,initial_connection_kernel):
+        """
+        Each Projection has a source sheet and target sheet.
         
+        Parameters
+        ----------
+        source : Sheet
+                 The sheet from which projection passes rates.
+
+        target : Sheet
+                 The sheet to which projection passes rates.
+                 
+        strength : float
+                 The strength of the projection.
+        """
+        Projection.__init__(self, name,source, target, strength,delay)
+        assert numpy.shape(initial_connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConnetionFieldProjection has to have add radius"
+        self.rad = int((numpy.shape(initial_connection_kernel)[0]-1)/2)
+        target_dim = self.target.radius*2
+        self.cfs = [[initial_connection_kernel.copy()[max(0,self.rad-j):target_dim-max(0,(j+self.rad)-target_dim),max(0,self.rad-i):target_dim-max(0,(i+self.rad)-target_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
+        
+        # make sure we created correct sizes
+        for i in xrange(self.target.radius*2):
+            for j in xrange(self.target.radius*2):
+                assert numpy.all(numpy.shape(self.cfs[i][j]) <= numpy.shape(initial_connection_kernel)) and numpy.all(numpy.shape(self.cfs[i][j]) > (self.rad,self.rad)) , "ERROR: Connection field created at location " + str(i) + "," + str(j) + " that has size: " + str(numpy.shape(self.cfs[i][j])) + " while template size is:" + str(numpy.shape(initial_connection_kernel))
+                self.cfs[i][j] = self.cfs[i][j].flatten()    
+        
+        self.activity = numpy.zeros((target_dim,target_dim))
+        
+        
+        
+    
+    def activate(self):
+        """
+        This returns a matrix of the same size as the target sheet, which corresponds to the contributions from this projections to the individual neurons.
+        """
+        size_diff = self.source.radius - self.target.radius
+        assert size_diff >=0 , "ERROR: The radius of source sheet of ConvolutionalProjection has to be larger than target"
+        
+        sa = self.source.get_activity(self.delay)
+        
+        for i in xrange(self.target.radius*2):
+            for j in xrange(self.target.radius*2):
+                self.activity[i][j] = numpy.dot(self.cfs[i][j],sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1].ravel())
+                #self.activity[i][j] = numpy.sum(numpy.multiply(self.cfs[i][j],sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1]))
+        
+        self.activity = self.activity * self.strength
+
