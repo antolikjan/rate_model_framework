@@ -6,7 +6,7 @@ import scipy.signal
 import pylab
 from visualization import *
 
-#pylab.ion()
+
 
 class Model(object):
       """
@@ -52,7 +52,7 @@ class Model(object):
               self.time += self.dt
           
               
-          print("Ran network for " + str(time) + "seconds.")
+          print("Ran network for " + str(time) + " seconds.")
          
                     
       
@@ -134,12 +134,6 @@ class Sheet(object):
         
         #make the dt step 
         self.vm = self.vm + self.dt*(-self.vm+self.activities[self.buffer_index])/self.time_constant
-        
-        #pylab.figure()
-        #pylab.imshow(self.vm,cmap='gray',interpolation=None)
-        #pylab.title('sheet')
-        #pylab.show()
-
         
         #apply the non-linearity    
         self.activities[self.buffer_index] = self.vm.clip(min=self.threshold)
@@ -244,12 +238,16 @@ class ConvolutionalProjection(Projection):
         Projection.__init__(self, name,source, target, strength,delay)
         self.connection_kernel = connection_kernel / numpy.sum(numpy.abs(connection_kernel))
         
-        assert numpy.shape(connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConnetionFieldProjection has to have add radius"
+        size_diff = self.source.radius - self.target.radius
+        assert size_diff >=0 , "ERROR: The radius of source sheet of ConvolutionalProjection has to be larger than target"
+        
+        assert numpy.shape(connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConvolutionalProjection has to have odd radius"
         
         #lets calculate edge correction factors:
         self.rad = int((numpy.shape(connection_kernel)[0]-1)/2)
         target_dim = self.target.radius*2
-        cfs = [[self.connection_kernel[max(0,self.rad-j):target_dim-max(0,(j+self.rad)-target_dim),max(0,self.rad-i):target_dim-max(0,(i+self.rad)-target_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
+        source_dim = self.source.radius*2
+        cfs = [[self.connection_kernel.copy()[max(0,self.rad-(size_diff+j)):2*self.rad+1-max(0,(size_diff+j+1+self.rad)-source_dim),max(0,self.rad-(size_diff+i)):2*self.rad+1-max(0,(size_diff+i+1+self.rad)-source_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
         self.corr_factors = numpy.array([[1/numpy.sum(numpy.abs(b)) for b in a] for a in cfs])
         
     def activate(self):
@@ -257,12 +255,10 @@ class ConvolutionalProjection(Projection):
         This returns a matrix of the same size as the target sheet, which corresponds to the contributions from this projections to the individual neurons.
         """
         size_diff = self.source.radius - self.target.radius
-        assert size_diff >=0 , "ERROR: The radios of source sheet of ConvolutionalProjection has to be larger than target"
         resp = scipy.signal.fftconvolve(self.source.get_activity(self.delay),self.connection_kernel, mode='same')
         if size_diff != 0:
             resp = resp[size_diff:-size_diff,size_diff:-size_diff]
         assert numpy.shape(resp) == (2*self.target.radius,2*self.target.radius), "ERROR: The size of calculated projection respone is " + str(numpy.shape(resp)) + "units, while the size of target sheet is " + str((2*self.target.radius,2*self.target.radius)) + " units"
-        
         self.activity = numpy.multiply(resp,self.corr_factors) * self.strength
 
 
@@ -291,34 +287,41 @@ class ConnetcionFieldProjection(Projection):
                  The strength of the projection.
         """
         Projection.__init__(self, name,source, target, strength,delay)
-        assert numpy.shape(initial_connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConnetionFieldProjection has to have add radius"
+        assert numpy.shape(initial_connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConnetionFieldProjection has to have odd radius"
+        assert numpy.all(numpy.shape(initial_connection_kernel) < (2*self.target.radius,2*self.target.radius))
+        
+        size_diff = self.source.radius - self.target.radius
+        assert size_diff >=0 , "ERROR: The radius of source sheet of ConvolutionalProjection has to be larger than target"
+        
+        
         self.rad = int((numpy.shape(initial_connection_kernel)[0]-1)/2)
+        source_dim = self.source.radius*2
         target_dim = self.target.radius*2
         initial_connection_kernel = initial_connection_kernel/numpy.sum(numpy.abs(initial_connection_kernel))
-        self.cfs = [[initial_connection_kernel.copy()[max(0,self.rad-j):target_dim-max(0,(j+self.rad)-target_dim),max(0,self.rad-i):target_dim-max(0,(i+self.rad)-target_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
+        self.cfs = [[initial_connection_kernel.copy()[max(0,self.rad-(size_diff+j)):2*self.rad+1-max(0,(size_diff+j+1+self.rad)-source_dim),max(0,self.rad-(size_diff+i)):2*self.rad+1-max(0,(size_diff+i+1+self.rad)-source_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
+        
         
         # make sure we created correct sizes
         for i in xrange(self.target.radius*2):
             for j in xrange(self.target.radius*2):
                 assert numpy.all(numpy.shape(self.cfs[i][j]) <= numpy.shape(initial_connection_kernel)) and numpy.all(numpy.shape(self.cfs[i][j]) > (self.rad,self.rad)) , "ERROR: Connection field created at location " + str(i) + "," + str(j) + " that has size: " + str(numpy.shape(self.cfs[i][j])) + " while template size is:" + str(numpy.shape(initial_connection_kernel))
-                self.cfs[i][j] = self.cfs[i][j].flatten()    
-        
+                # flatten and normalize 
+                self.cfs[i][j] = self.cfs[i][j].flatten()  / numpy.sum(numpy.abs(self.cfs[i][j]))
+                
         self.activity = numpy.zeros((target_dim,target_dim))
     
     def activate(self):
         """
         This returns a matrix of the same size as the target sheet, which corresponds to the contributions from this projections to the individual neurons.
         """
-        size_diff = self.source.radius - self.target.radius
-        assert size_diff >=0 , "ERROR: The radius of source sheet of ConvolutionalProjection has to be larger than target"
-        
         sa = self.source.get_activity(self.delay)
+        size_diff = self.source.radius - self.target.radius
         
         for i in xrange(self.target.radius*2):
             for j in xrange(self.target.radius*2):
-                self.activity[i][j] = numpy.dot(self.cfs[i][j],sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1].ravel())
+                self.activity[i][j] = self.cfs[i][j].dot(sa[max(size_diff+i-self.rad,0):size_diff+i+self.rad+1,max(size_diff+j-self.rad,0):size_diff+j+self.rad+1].ravel())
                 
-        self.activity = self.activity * self.strength
+        self.activity *= self.strength
 
 
 
@@ -329,15 +332,14 @@ def applyHebianLearningStepOnAConnetcionFieldProjection(projection,learning_rate
     
     sa = projection.source.get_activity(projection.delay)
     pa = projection.target.get_activity(delay)
+    size_diff = self.source.radius - self.target.radius
     
     for i in xrange(projection.target.radius*2):
             for j in xrange(projection.target.radius*2):
-                projection.cfs[i][j] = projection.cfs[i][j]+ pa[i][j]*sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1].ravel()
+                projection.cfs[i][j] = projection.cfs[i][j]+pa[i][j]*sa[max(size_diff+i-self.rad,0):size_diff+i+self.rad+1,max(size_diff+j-self.rad,0):size_diff+j+self.rad+1].ravel()
     
                 # we have to renormalize the connection field
                 projection.cfs[i][j] = projection.cfs[i][j] / numpy.sum(numpy.abs(projection.cfs[i][j]))
-    
-    
     
     
     
