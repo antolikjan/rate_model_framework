@@ -223,6 +223,8 @@ class ConvolutionalProjection(Projection):
     """
     A projection which has only one set of connections (connection kernel) which are assumed to be the same for all target neurons, except being centered on their position.
     This means that the output of ConvolutionalProjection is the spatial convolution of this connection kernel with the activities of the source Sheet.
+    
+    Note that the connection_kernel will be normalized so that the sum of it's absolute values is 1.
     """
     def __init__(self,name,source, target, strength,delay,connection_kernel):
         """
@@ -240,10 +242,16 @@ class ConvolutionalProjection(Projection):
                  The strength of the projection.
         """
         Projection.__init__(self, name,source, target, strength,delay)
-        self.connection_kernel = connection_kernel
+        self.connection_kernel = connection_kernel / numpy.sum(numpy.abs(connection_kernel))
         
+        assert numpy.shape(connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConnetionFieldProjection has to have add radius"
         
-    
+        #lets calculate edge correction factors:
+        self.rad = int((numpy.shape(connection_kernel)[0]-1)/2)
+        target_dim = self.target.radius*2
+        cfs = [[self.connection_kernel[max(0,self.rad-j):target_dim-max(0,(j+self.rad)-target_dim),max(0,self.rad-i):target_dim-max(0,(i+self.rad)-target_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
+        self.corr_factors = numpy.array([[1/numpy.sum(numpy.abs(b)) for b in a] for a in cfs])
+        
     def activate(self):
         """
         This returns a matrix of the same size as the target sheet, which corresponds to the contributions from this projections to the individual neurons.
@@ -255,14 +263,17 @@ class ConvolutionalProjection(Projection):
             resp = resp[size_diff:-size_diff,size_diff:-size_diff]
         assert numpy.shape(resp) == (2*self.target.radius,2*self.target.radius), "ERROR: The size of calculated projection respone is " + str(numpy.shape(resp)) + "units, while the size of target sheet is " + str((2*self.target.radius,2*self.target.radius)) + " units"
         
-        self.activity = resp * self.strength
+        self.activity = numpy.multiply(resp,self.corr_factors) * self.strength
 
 
 
-class ConnetionFieldProjection(Projection):    
+class ConnetcionFieldProjection(Projection):    
     """
     A projection which has only one set of connections (connection kernel) which are assumed to be the same for all target neurons, except being centered on their position.
     This means that the output of ConvolutionalProjection is the spatial convolution of this connection kernel with the activities of the source Sheet.
+    
+    Note that all connection fields, including the border ones, will be normalized so that the sum of their absolute values is 1.
+    
     """
     def __init__(self,name,source, target, strength,delay,initial_connection_kernel):
         """
@@ -283,6 +294,7 @@ class ConnetionFieldProjection(Projection):
         assert numpy.shape(initial_connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConnetionFieldProjection has to have add radius"
         self.rad = int((numpy.shape(initial_connection_kernel)[0]-1)/2)
         target_dim = self.target.radius*2
+        initial_connection_kernel = initial_connection_kernel/numpy.sum(numpy.abs(initial_connection_kernel))
         self.cfs = [[initial_connection_kernel.copy()[max(0,self.rad-j):target_dim-max(0,(j+self.rad)-target_dim),max(0,self.rad-i):target_dim-max(0,(i+self.rad)-target_dim)] for i in xrange(target_dim)] for j in xrange(target_dim)]
         
         # make sure we created correct sizes
@@ -292,9 +304,6 @@ class ConnetionFieldProjection(Projection):
                 self.cfs[i][j] = self.cfs[i][j].flatten()    
         
         self.activity = numpy.zeros((target_dim,target_dim))
-        
-        
-        
     
     def activate(self):
         """
@@ -308,7 +317,28 @@ class ConnetionFieldProjection(Projection):
         for i in xrange(self.target.radius*2):
             for j in xrange(self.target.radius*2):
                 self.activity[i][j] = numpy.dot(self.cfs[i][j],sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1].ravel())
-                #self.activity[i][j] = numpy.sum(numpy.multiply(self.cfs[i][j],sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1]))
-        
+                
         self.activity = self.activity * self.strength
 
+
+
+def applyHebianLearningStepOnAConnetcionFieldProjection(projection,learning_rate):
+    """
+    This method when applied to a ConnetcionFieldProjection will perform a single step of hebbian learning with learning rate *learning_rate*.
+    """
+    
+    sa = projection.source.get_activity(projection.delay)
+    pa = projection.target.get_activity(delay)
+    
+    for i in xrange(projection.target.radius*2):
+            for j in xrange(projection.target.radius*2):
+                projection.cfs[i][j] = projection.cfs[i][j]+ pa[i][j]*sa[max(i-self.rad,0):i+self.rad+1,max(j-self.rad,0):j+self.rad+1].ravel()
+    
+                # we have to renormalize the connection field
+                projection.cfs[i][j] = projection.cfs[i][j] / numpy.sum(numpy.abs(projection.cfs[i][j]))
+    
+    
+    
+    
+    
+    
