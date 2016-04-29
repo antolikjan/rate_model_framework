@@ -1,5 +1,7 @@
 import rate_model
 import pylab
+import matplotlib.gridspec as gridspec
+import numpy
     
 def display_model_state(model):
     # find the longest number of projections
@@ -26,3 +28,26 @@ def display_model_state(model):
         
     
     pylab.tight_layout()
+
+
+def plot_projection(projection,downsample=0.2):
+    """
+    Plots the connection fields in the projection. Only *downsample* fraction (evenly spaced) of the connection fields will be shown
+    """
+    
+    size = int(numpy.floor(numpy.floor(2*projection.target.radius * downsample)))
+    
+    step = int(numpy.round(1/downsample))
+    
+    gs = gridspec.GridSpec(int(size), int(size))
+    gs.update(left=0.05, right=0.95, top=0.95, bottom=0.05,hspace=0.1,wspace=0.1)
+    
+    for i in range(size):
+        for j in range(size):
+            pylab.subplot(gs[int(i),int(j)])
+            pylab.imshow(projection.get_cf(i*step,j*step),interpolation='none',cmap='gray')
+            pylab.axis('off')
+    
+    #pylab.tight_layout()
+            
+        
