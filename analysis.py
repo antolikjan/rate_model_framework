@@ -92,5 +92,6 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
            pylab.axis('off')
            pylab.colorbar(im,fraction=0.046, pad=0.04)
         
+        pylab.savefig("maps.png",dpi=600)
     
     return orientation_preference_maps,orientation_selectivity_maps

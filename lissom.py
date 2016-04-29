@@ -32,7 +32,7 @@ V1_lat_inh_kernel = imagen.Gaussian(xdensity=11,ydensity=11,aspect_ratio=1.0,siz
 V1_lat_exc_kernel = V1_lat_exc_kernel/V1_lat_exc_kernel.sum()
 V1_lat_inh_kernel = V1_lat_inh_kernel/V1_lat_inh_kernel.sum()
 V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,2*3.91,0.0002,V1_lat_exc_kernel)
-V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,2.4*-3.45,0.0002,V1_lat_inh_kernel)
+V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,2.5*-3.45,0.0002,V1_lat_inh_kernel)
 
 #Model initialization and execution
 lissom = Model([retina,lgn_on,lgn_off,V1],0.0001)
@@ -48,12 +48,15 @@ g2 = imagen.Gaussian(xdensity=72,ydensity=72,x=numbergen.UniformRandom(lbound=-0
                      size=0.048388, aspect_ratio=4.66667, scale=1.0)
         
 
-for i in xrange(20):
+for i in xrange(10):
     retina.set_activity(numpy.maximum(g1(),g2()))
-    lissom.run(0.04)
+    lissom.run(0.03)
     print i
-    applyHebianLearningStepOnAFastConnetcionFieldProjection(lgn_on_to_V1,0.1)
-    applyHebianLearningStepOnAFastConnetcionFieldProjection(lgn_off_to_V1,0.1)
+    applyHebianLearningStepOnAFastConnetcionFieldProjection(lgn_on_to_V1,0.5)
+    applyHebianLearningStepOnAFastConnetcionFieldProjection(lgn_off_to_V1,0.5)
+    
+    pylab.figure()
+    display_model_state(lissom,filename="model_response.png")
 
 import pickle
 f = open('lissom_short.pickle','wb')
@@ -61,11 +64,15 @@ pickle.dump(lissom,f)
 f.close()
 
 pylab.figure()
-plot_projection(lgn_on_to_V1)
-pylab.figure()
-plot_projection(lgn_off_to_V1)
+plot_projection(lgn_on_to_V1,filename="onProjection.png")
 
-pylab.show()
+pylab.figure()
+plot_projection(lgn_off_to_V1,filename="offProjection.png")
+
+pylab.figure()
+fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=V1,num_orientation=8,num_phase=10,duration=0.03,filename="responses.pickle",plot=True,load=False)
+
+
 
 
 

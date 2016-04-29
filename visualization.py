@@ -3,7 +3,7 @@ import pylab
 import matplotlib.gridspec as gridspec
 import numpy
     
-def display_model_state(model):
+def display_model_state(model,filename=None):
     # find the longest number of projections
     max_num_in_projections = 0
     for s in model.sheets:
@@ -28,9 +28,11 @@ def display_model_state(model):
         
     
     pylab.tight_layout()
+    if filename:
+       pylab.savefig(filename,dpi=600)
 
 
-def plot_projection(projection,downsample=0.2):
+def plot_projection(projection,downsample=0.2,filename=None):
     """
     Plots the connection fields in the projection. Only *downsample* fraction (evenly spaced) of the connection fields will be shown
     """
@@ -48,6 +50,7 @@ def plot_projection(projection,downsample=0.2):
             pylab.imshow(projection.get_cf(i*step,j*step),interpolation='none',cmap='gray')
             pylab.axis('off')
     
-    #pylab.tight_layout()
+    if filename:
+       pylab.savefig(filename,dpi=600)
             
         
