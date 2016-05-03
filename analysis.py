@@ -58,15 +58,6 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
         pylab.figure()
         pylab.subplot(1,len(angles),1)
         sheet_size = numpy.sqrt(len(resp[0]))
-        print sheet_size
-        for i in xrange(len(angles)):
-                pylab.subplot(1,len(angles),i)
-                im = pylab.imshow(numpy.resize(resp[i],(sheet_size,sheet_size)),interpolation='nearest',cmap='gray')
-                pylab.axis('off')    
-                pylab.colorbar(im,fraction=0.046, pad=0.04)
-           
-        
-        pylab.show()
         # calculate selectivity and preference as the angle and magnitude of the mean of the responses projected into polar coordinates based on the orientation angle
         # to which they were collected
         polar_resp = resp * numpy.array(angles_as_complex_numbers)[:,numpy.newaxis]
@@ -83,7 +74,7 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
        for i,s in enumerate(responses.keys()):
            sheet_size = numpy.sqrt(len(orientation_preference_maps[k]))
            pylab.subplot(gs[0,i])
-           im=pylab.imshow(numpy.resize(orientation_preference_maps[k],(sheet_size,sheet_size)),interpolation='nearest')
+           im=pylab.imshow(numpy.resize(orientation_preference_maps[k],(sheet_size,sheet_size)),interpolation='nearest',cmap='hsv')
            pylab.axis('off')    
            pylab.colorbar(im,fraction=0.046, pad=0.04)
            
@@ -92,6 +83,5 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
            pylab.axis('off')
            pylab.colorbar(im,fraction=0.046, pad=0.04)
         
-        pylab.savefig("maps.png",dpi=600)
     
     return orientation_preference_maps,orientation_selectivity_maps

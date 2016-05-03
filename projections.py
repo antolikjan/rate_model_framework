@@ -191,16 +191,21 @@ class FastConnetcionFieldProjection(Projection):
         source_dim = self.source.radius*2
         target_dim = self.target.radius*2
         self.cfs = numpy.zeros((target_dim*target_dim,source_dim*source_dim))
+        self.masks = numpy.zeros((target_dim*target_dim,source_dim*source_dim))
         
         padding = max(0,self.rad-size_diff)
         tmp = numpy.zeros((source_dim+padding*2,source_dim+padding*2))
         offset = size_diff + padding
-        
+        ons = numpy.ones(numpy.shape(initial_connection_kernel))
         for i in xrange(target_dim):
             for j in xrange(target_dim):
                 tmp *=0
                 tmp[i+offset-self.rad:i+offset+self.rad+1,j+offset-self.rad:j+offset+self.rad+1] = initial_connection_kernel
                 self.cfs[i*target_dim+j,:] = tmp[padding:source_dim+padding,padding:source_dim+padding].copy().flatten() / numpy.sum(numpy.abs(tmp[padding:source_dim+padding,padding:source_dim+padding]))
+                tmp[i+offset-self.rad:i+offset+self.rad+1,j+offset-self.rad:j+offset+self.rad+1] = ons
+                self.masks[i*target_dim+j,:] = tmp[padding:source_dim+padding,padding:source_dim+padding].copy().flatten()
+        
+        assert numpy.min(self.masks) == 0 and numpy.max(self.masks) == 1
         self.activity = numpy.zeros((target_dim,target_dim))
     
     def activate(self):

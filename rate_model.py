@@ -177,7 +177,8 @@ def applyHebianLearningStepOnAFastConnetcionFieldProjection(projection,learning_
     """
     sa = projection.source.get_activity(projection.delay).ravel()
     ta = projection.target.get_activity(0).ravel()
-    projection.cfs += learning_rate * numpy.dot(ta[:,numpy.newaxis],sa[numpy.newaxis,:])    
+    projection.cfs += learning_rate * numpy.dot(ta[:,numpy.newaxis],sa[numpy.newaxis,:])
+    projection.cfs = numpy.multiply(projection.cfs,projection.masks)
     projection.cfs = projection.cfs / numpy.sum(numpy.abs(projection.cfs),axis=1)[:,numpy.newaxis]
     
     
