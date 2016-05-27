@@ -137,7 +137,7 @@ class ConnetcionFieldProjection(Projection):
                 # flatten and normalize 
                 self.cfs[i][j] = self.cfs[i][j].flatten()  / numpy.sum(numpy.abs(self.cfs[i][j]))
                 
-        self.activity = numpy.zeros((target_dim,target_dim))
+        self.activity = numpy.zeros((target_dim,target_dim),dtype=numpy.float32)
     
     def activate(self):
         """
@@ -163,7 +163,7 @@ class FastConnetcionFieldProjection(Projection):
     
     Note that all connection fields, including the border ones, will be normalized so that the sum of their absolute values is 1.    
     """
-    def __init__(self,name,source, target, strength,delay,initial_connection_kernel):
+    def __init__(self,name,source, target, strength,delay,initial_connection_kernel,mask=None):
         """
         Each Projection has a source sheet and target sheet.
         
@@ -182,26 +182,31 @@ class FastConnetcionFieldProjection(Projection):
                  The initial connection kernel. 
         """
         Projection.__init__(self, name,source, target, strength,delay)
-        assert numpy.shape(initial_connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for FastConnetcionFieldProjection has to have odd radius"
-        assert numpy.all(numpy.shape(initial_connection_kernel) <= (2*self.source.radius,2*self.source.radius))
-        assert numpy.sum(numpy.abs(initial_connection_kernel)) != 0 , "ERROR: initial kernel for FastConnetcionFieldProjection has to have non zero L1 norm"
+        assert numpy.shape(initial_connection_kernel())[0] % 2 == 1, "ERROR: initial kernel for FastConnetcionFieldProjection has to have odd radius"
+        assert numpy.all(numpy.shape(initial_connection_kernel()) <= (2*self.source.radius,2*self.source.radius))
+        assert numpy.sum(numpy.abs(initial_connection_kernel())) != 0 , "ERROR: initial kernel for FastConnetcionFieldProjection has to have non zero L1 norm"
         size_diff = self.source.radius - self.target.radius 
         assert size_diff >=0 , "ERROR: The radius of source sheet of ConvolutionalProjection has to be larger than target"
-        self.rad = int((numpy.shape(initial_connection_kernel)[0]-1)/2)
+        self.rad = int((numpy.shape(initial_connection_kernel())[0]-1)/2)
         source_dim = self.source.radius*2
         target_dim = self.target.radius*2
-        self.cfs = numpy.zeros((target_dim*target_dim,source_dim*source_dim))
+        self.cfs = numpy.zeros((target_dim*target_dim,source_dim*source_dim),dtype=numpy.float32)
+        self.masks = numpy.zeros((target_dim*target_dim,source_dim*source_dim),dtype=numpy.float32)
         
         padding = max(0,self.rad-size_diff)
-        tmp = numpy.zeros((source_dim+padding*2,source_dim+padding*2))
+        tmp = numpy.zeros((source_dim+padding*2,source_dim+padding*2),dtype=numpy.float32)
         offset = size_diff + padding
-        
+        ons = numpy.multiply(numpy.ones(numpy.shape(initial_connection_kernel())),mask)
         for i in xrange(target_dim):
             for j in xrange(target_dim):
                 tmp *=0
-                tmp[i+offset-self.rad:i+offset+self.rad+1,j+offset-self.rad:j+offset+self.rad+1] = initial_connection_kernel
+                tmp[i+offset-self.rad:i+offset+self.rad+1,j+offset-self.rad:j+offset+self.rad+1] = initial_connection_kernel()
                 self.cfs[i*target_dim+j,:] = tmp[padding:source_dim+padding,padding:source_dim+padding].copy().flatten() / numpy.sum(numpy.abs(tmp[padding:source_dim+padding,padding:source_dim+padding]))
-        self.activity = numpy.zeros((target_dim,target_dim))
+                tmp[i+offset-self.rad:i+offset+self.rad+1,j+offset-self.rad:j+offset+self.rad+1] = ons
+                self.masks[i*target_dim+j,:] = tmp[padding:source_dim+padding,padding:source_dim+padding].copy().flatten()
+        
+        assert numpy.min(self.masks) == 0 and numpy.max(self.masks) == 1
+        self.activity = numpy.zeros((target_dim,target_dim),dtype=numpy.float32)
     
     def activate(self):
         """
@@ -213,9 +218,11 @@ class FastConnetcionFieldProjection(Projection):
         
     def get_cf(self,posx,posy):
         size_diff = self.source.radius - self.target.radius
+        padding = max(0,self.rad-size_diff)
+        offset = size_diff + padding
+        return numpy.reshape(self.cfs[posx*self.target.radius*2+posy,:],(self.source.radius*2,self.source.radius*2))[posx+offset-self.rad:posx+offset+self.rad+1,posy+offset-self.rad:posy+offset+self.rad+1]
         
-        return numpy.reshape(self.cfs[posx*self.target.radius*2+posy,:],(self.source.radius*2,self.source.radius*2))
-        #[posx+size_diff-self.rad,posx+size_diff+self.rad+1][posy+size_diff-self.rad,posy+size_diff+self.rad+1]
+        
     
     
     

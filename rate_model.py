@@ -54,7 +54,9 @@ class Model(object):
               
           print("Ran network for " + str(time) + " seconds.")
          
-                    
+      def reset(self):
+ 		for s in self.sheets:
+ 		    s.reset()	                    
       
     
 
@@ -79,7 +81,7 @@ class Sheet(object):
                   The threshold of the units in the sheet.
         """
         self.radius = radius
-        self.vm = numpy.zeros((2*radius,2*radius))
+        self.vm = numpy.zeros((2*radius,2*radius),dtype=numpy.float32)
         self.threshold = threshold
         self.in_projections = []
         self.out_projections = []
@@ -96,7 +98,7 @@ class Sheet(object):
         self.dt = dt
         self.buffer_index = 0
         self.buffer_depth = buffer_depth
-        self.activities = numpy.zeros((buffer_depth,2*self.radius,2*self.radius))
+        self.activities = numpy.zeros((buffer_depth,2*self.radius,2*self.radius),dtype=numpy.float32)
         self.not_initialized = False
 
     
@@ -177,7 +179,8 @@ def applyHebianLearningStepOnAFastConnetcionFieldProjection(projection,learning_
     """
     sa = projection.source.get_activity(projection.delay).ravel()
     ta = projection.target.get_activity(0).ravel()
-    projection.cfs += learning_rate * numpy.dot(ta[:,numpy.newaxis],sa[numpy.newaxis,:])    
+    projection.cfs += learning_rate * numpy.dot(ta[:,numpy.newaxis],sa[numpy.newaxis,:])
+    projection.cfs = numpy.multiply(projection.cfs,projection.masks)
     projection.cfs = projection.cfs / numpy.sum(numpy.abs(projection.cfs),axis=1)[:,numpy.newaxis]
     
     
