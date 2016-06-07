@@ -39,9 +39,8 @@ class Model(object):
           # not exact but close enough
           assert abs(time - int(numpy.round(time / self.dt))*self.dt) < 0.000000001*self.dt, "You can only run the network for times that are multiples of dt"
           
-          
+
           for i in xrange(0,int(numpy.round(time/self.dt))):
-              
               for s in self.sheets:
                   for p in s.in_projections:
                       if p.source.changed:
@@ -49,6 +48,9 @@ class Model(object):
                 
               for s in self.sheets:
                   s.update()
+              
+              for s in self.sheets:
+                  s.changed = s.tmp_changed
               
               self.time += self.dt
           
@@ -90,6 +92,7 @@ class Sheet(object):
         assert density * (size/2) % 1 == 0, "Density of the sheet times radius (size/2) has to be integer, but %f * %f / 2 = %f" % (density,size,density * (size/2) )
         self.unit_diameter = int(numpy.floor(self.size/2*self.density)*2)
         self.changed=True
+        self.tmp_changed=True
         self.vm = numpy.zeros((self.unit_diameter,self.unit_diameter),dtype=numpy.float32)
         self.threshold = numpy.ones(self.vm.shape)*threshold
         self.in_projections = []
@@ -115,9 +118,11 @@ class Sheet(object):
         """
         Return's sheet activity delay in the past (rounded to the nearest multiple of dt).
         """
+        assert delay > 0
         index = numpy.round(delay/self.dt)
-        assert index < self.buffer_depth, "ERROR: Activity with delay longer then the depth of activity buffer requested. " + str(self.buffer_depth) + ' ' + str(index)
-        return self.activities[(self.buffer_index-index-1) % self.buffer_depth]
+        assert index < self.buffer_depth, "ERROR: Activity with delay longer then the depth of activity buffer requested: " + str(self.buffer_depth) + ' ' + str(index)
+        assert index > 0, "ERROR: Activity with delay less than timestep of simulation requested: " + str(self.dt) + ' ' + str(delay)
+        return self.activities[(self.buffer_index-index) % self.buffer_depth]
     
     def _register_in_projection(self,projection):
         """
@@ -139,7 +144,7 @@ class Sheet(object):
         #delete new activities    
         self.activities[self.buffer_index]*=0
         
-        # sum the activity comming from all projections
+        #sum the activity comming from all projections
         for p in self.in_projections:
             self.activities[self.buffer_index] += p.activity
         
@@ -147,7 +152,7 @@ class Sheet(object):
         self.vm = self.vm + self.dt*(-self.vm+self.activities[self.buffer_index])/self.time_constant
         
         #apply the non-linearity    
-        self.activities[self.buffer_index] = self.vm.clip(min=self.threshold)
+        self.activities[self.buffer_index] = (self.vm - self.threshold).clip(0)
         
         #once all done, advance our buffer depth
         self.buffer_index = (self.buffer_index + 1) % self.buffer_depth
@@ -159,6 +164,9 @@ class Sheet(object):
         self.activities *= 0
         self.buffer_index = 0
         self.vm *= 0
+        self.tmp_changed=True
+        self.changed=True
+
     
     def index_to_coord(self,x,y):
         """
@@ -220,6 +228,7 @@ class NoTimeconstantSheet(Sheet):
         assert density * (size/2) % 1 == 0, "Density of the sheet times radius (size/2) has to be integer, but %f * %f / 2 = %f" % (density,size,density * (size/2) )
         self.unit_diameter = int(numpy.floor(self.size/2*self.density)*2)
         self.changed=True
+        self.tmp_changed=True
         self.threshold = threshold
         self.in_projections = []
         self.out_projections = []
@@ -251,15 +260,17 @@ class NoTimeconstantSheet(Sheet):
             self.activities += p.activity
         
         #apply the non-linearity    
-        self.activities = self.activities.clip(min=self.threshold)
+        self.activities = (self.activities-self.threshold).clip(0)
           
-        self.changed = sum([p.source.changed for p in self.in_projections])
+        self.tmp_changed = sum([p.source.changed for p in self.in_projections])
     
     def reset(self):
         """
         Resets the sheet to be in the same state as after initialization (including he call to _initialize).
         """
         self.activities *= 0
+        self.tmp_changed=True
+        self.changed=True
         
 class InputSheet(NoTimeconstantSheet):
     """
@@ -269,7 +280,6 @@ class InputSheet(NoTimeconstantSheet):
     """
     def __init__(self,*params):
         NoTimeconstantSheet.__init__(self,*params)
-        self.flag=True
      
     def _register_projection(self,projection):
         """
@@ -278,16 +288,13 @@ class InputSheet(NoTimeconstantSheet):
         raise Error, "Input sheet cannot accept incomming projections."
     
     def set_activity(self,activity):
-        self.flag=False
         assert numpy.shape(activity) == numpy.shape(self.activities)
         self.activities = activity
+        self.tmp_changed=True
+        self.changed=True
     
     def update(self):
-        if self.flag == False:
-            self.changed=True
-            self.flag=True
-        else:
-            self.changed=False
+        self.tmp_changed=False
 
 
 class HomeostaticSheet(Sheet):
@@ -317,3 +324,42 @@ class HomeostaticSheet(Sheet):
     
     
     
+
+    def _update_threshold(self, prev_t, x, prev_avg, smoothing, learning_rate, target_activity):
+        """
+        Applies exponential smoothing to the given current activity and previous
+        smoothed value following the equations given in the report cited above.
+        """
+        y_avg = (1.0-smoothing)*x + smoothing*prev_avg
+        t = prev_t + learning_rate * (y_avg - target_activity)
+        return (y_avg, t)
+
+
+    def __call__(self,x):
+        """Initialises on the first call and then applies homeostasis."""
+        if self.first_call: self._initialize(x); self.first_call = False
+
+        if (topo.sim.time() > self._next_update_timestamp):
+            self._next_update_timestamp += self.period
+            # Using activity matrix and and smoothed activity from *previous* call.
+            (self.y_avg, self.t) = self._update_threshold(self.t, self._x_prev, self._y_avg_prev,
+                                                          self.smoothing, self.learning_rate,
+                                                          self.target_activity)
+            self._y_avg_prev = self.y_avg   # Copy only if not in continuous mode
+
+        self._apply_threshold(x)            # Apply the threshold only after it is updated
+        self._x_prev[...,...] = x[...,...]  # Recording activity for the next periodic update
+
+    def _initialize(self,x):
+        self._x_prev = numpy.copy(x)
+        self._y_avg_prev = ones(x.shape, x.dtype.char) * self.target_activity
+
+        if self.randomized_init:
+            self.t = ones(x.shape, x.dtype.char) * self.t_init + \
+                (topo.pattern.random.UniformRandom( \
+                    random_generator=numpy.random.RandomState(seed=self.seed)) \
+                     (xdensity=x.shape[0],ydensity=x.shape[1]) \
+                     -0.5)*self.noise_magnitude*2
+        else:
+            self.t = ones(x.shape, x.dtype.char) * self.t_init
+        self.y_avg = ones(x.shape, x.dtype.char) * self.target_activity

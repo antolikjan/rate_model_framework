@@ -23,7 +23,7 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
         
         #initialize the 
         for s in sheets:
-            responses[s.name] = numpy.zeros((num_orientation,num_phase,(s.radius*2)**2))
+            responses[s.name] = numpy.zeros((num_orientation,num_phase,(s.unit_diameter)**2))
         
         #present the stimulation protocol and collect data
         for i in xrange(num_orientation):
@@ -32,11 +32,11 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
                     if reset:
                         s.reset()
 
-                stim = SineGrating(orientation=numpy.pi/num_orientation*i,phase=numpy.pi*2/num_phase*j,xdensity=retina.radius*2,ydensity=retina.radius*2,frequency=frequency,scale=scale)()
+                stim = SineGrating(orientation=numpy.pi/num_orientation*i,phase=numpy.pi*2/num_phase*j,xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,frequency=frequency,scale=scale)()
                 retina.set_activity(stim)
                 model.run(duration)
                 for s in sheets:
-                    responses[s.name][i,j,:] = s.get_activity(0).copy().ravel()    
+                    responses[s.name][i,j,:] = s.get_activity(model.dt).copy().ravel()    
                     
         if filename != None:
            import pickle

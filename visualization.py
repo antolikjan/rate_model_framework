@@ -13,7 +13,7 @@ def display_model_state(model,filename=None):
     for i in range(len(model.sheets)):
         pylab.subplot(max_num_in_projections+1, len(model.sheets),  i + 1 )
         pylab.title(model.sheets[i].name)
-        im = pylab.imshow(model.sheets[i].get_activity(0),cmap='gray',interpolation='nearest')
+        im = pylab.imshow(model.sheets[i].get_activity(model.dt),cmap='gray',interpolation='nearest')
         pylab.colorbar(im,fraction=0.046, pad=0.04)
         
         for j in range(len(model.sheets[i].in_projections)):

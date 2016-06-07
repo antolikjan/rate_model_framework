@@ -41,20 +41,14 @@ retina_to_lgn_off = FastConnetcionFieldProjection("RetinaToLgnOff",retina,lgn_of
 lgn_on_to_V1 = FastConnetcionFieldProjection("LGNOnToV1",lgn_on,V1,0.5,0.001,0.27083,imagen.random.GaussianCloud(gaussian_size=2*0.27083))
 lgn_off_to_V1 = FastConnetcionFieldProjection("LGNOffToV1",lgn_off,V1,0.5,0.001,0.27083,imagen.random.GaussianCloud(gaussian_size=2*0.27083))
 
-center_lat  = imagen.Gaussian(size=0.05,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()],xdensity=V1.density+1,ydensity=V1.density+1,bounds = BoundingBox(radius=V1.size/2.0))()
-surround_lat = imagen.Gaussian(size=0.15,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()],xdensity=V1.density+1,ydensity=V1.density+1,bounds = BoundingBox(radius=V1.size/2.0))()
+center_lat  = imagen.Gaussian(size=0.05,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()],xdensity=V1.density+1,ydensity=V1.density+1,bounds = BoundingBox(radius=V1.size/2.0))()[14:-14,14:-14]
+surround_lat = imagen.Gaussian(size=0.15,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()],xdensity=V1.density+1,ydensity=V1.density+1,bounds = BoundingBox(radius=V1.size/2.0))()[14:-14,14:-14]
 center_lat = center_lat / numpy.sum(center_lat)
 surround_lat = surround_lat / numpy.sum(surround_lat)
-lat_kernel = center_lat - float(sys.argv[2])*surround_lat
 
-#V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,lat_kernel)
-
-#V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,center_lat)
-#V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,-0.5*float(sys.argv[1])*float(sys.argv[2]),0.001,surround_lat)
-
-V1_lat = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,0.104,imagen.Gaussian(aspect_ratio=1.0, size=0.05))
+V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,center_lat)
+V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,-0.5*float(sys.argv[1])*float(sys.argv[2]),0.001,surround_lat)
 #V1_lat_exc = FastConnetcionFieldProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,0.104,imagen.Gaussian(aspect_ratio=1.0, size=0.05))
-
 #V1_lat_inh = FastConnetcionFieldProjection("LateralInh",V1,V1,-0.5*float(sys.argv[1])*float(sys.argv[2]),0.001,0.22917,imagen.Gaussian(aspect_ratio=1.0, size=0.15))
 
 #Model initialization and execution
@@ -71,38 +65,36 @@ g2 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter
                      size=0.7*0.048388, aspect_ratio=1.2*4.66667, scale=1.0)
         
         
-run_for = 1
+#pylab.figure();plot_projection(lgn_on_to_V1,filename="onProjection.png");pylab.show()
+        
+        
+run_for = 10000
 t = time.time()
 for i in xrange(run_for):
     retina.set_activity(numpy.maximum(g1(),g2()))
     lissom.run(0.15)
-    #pylab.figure();display_model_state(lissom);
+    #pylab.figure();display_model_state(lissom);pylab.show()
     #lissom.run(0.15)
-    pylab.figure();display_model_state(lissom);
-    
-    
-    
+    #pylab.figure();display_model_state(lissom);
     #pylab.figure();plot_projection(lgn_on_to_V1,downsample=0.5)
     #pylab.figure();plot_projection(retina_to_lgn_off,filename="RatinaToLgnOff.png")
-    pylab.show()
+    #pylab.figure();display_model_state(lissom,filename="activity.png"); pylab.show()
     
     
     lgn_on_to_V1.applyHebianLearningStep(float(sys.argv[3]))
     lgn_off_to_V1.applyHebianLearningStep(float(sys.argv[3]))
     print i , ":", "Expected time to run: " , ((time.time()-t)/(i+1)) * (run_for-i) , "s"
+   
     if i == run_for-1:
        pylab.figure();display_model_state(lissom,filename="activity.png")
     lissom.reset()
-    
    
 if True:    
     import pickle
     f = open('lissom_long.pickle','wb')
     pickle.dump(lissom,f)
     f.close()
-
     
-
 pylab.figure()
 plot_projection(lgn_on_to_V1,filename="onProjection.png")
 
@@ -113,15 +105,12 @@ pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheet
 pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=[V1],num_orientation=8,num_phase=10,duration=0.02,frequency=10.0,filename="freq=10",reset=True,plot=True,load=False)
 
 
-if False:
-    pylab.figure();display_model_state(lissom)
-    
-    
+
+if True:
     pylab.figure()
     plot_projection(lgn_on_to_V1)
     pylab.figure()
     plot_projection(lgn_off_to_V1)
-    
     pylab.show()
 
 

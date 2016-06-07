@@ -36,6 +36,7 @@ class Projection(object):
         self.target._register_in_projection(self)
         self.source._register_out_projection(self)
         self.activity = None
+        self.changed =True
         
     
     def activate(self):
@@ -109,14 +110,14 @@ class FastConnetcionFieldProjection(Projection):
         ci,cj = self.target.index_to_coord(posx,posy)
         xi,yi = self.source.coord_to_index(ci-self.radius,cj-self.radius,clipped=True)
         xa,ya = self.source.coord_to_index(ci+self.radius,cj+self.radius,clipped=True)
-        return numpy.reshape(self.cfs[posx*self.target.unit_diameter+posy,:],(self.source.unit_diameter,self.source.unit_diameter))[xi:xa,yi:ya]
+        return numpy.reshape(self.cfs[posx*self.target.unit_diameter+posy,:],(self.source.unit_diameter,self.source.unit_diameter))#[xi:xa,yi:ya]
         
     def applyHebianLearningStep(self,learning_rate):
         """
         This method when applied to a ConnetcionFieldProjection will perform a single step of hebbian learning with learning rate *learning_rate*.
         """
         sa = self.source.get_activity(self.delay).ravel()
-        ta = self.target.get_activity(0).ravel()
+        ta = self.target.get_activity(self.target.dt).ravel()
         self.cfs += learning_rate * numpy.dot(ta[:,numpy.newaxis],sa[numpy.newaxis,:])
         self.cfs = numpy.multiply(self.cfs,self.masks)
         self.cfs = self.cfs / numpy.sum(numpy.abs(self.cfs),axis=1)[:,numpy.newaxis]
@@ -150,20 +151,16 @@ class ConvolutionalProjection(Projection):
         assert self.source.density == self.target.density , "ERROR: The density of source sheet of ConvolutionalProjection has to be same as that of target sheet"
         assert self.target.unit_diameter == self.source.unit_diameter
         assert numpy.shape(connection_kernel)[0] % 2 == 1, "ERROR: initial kernel for ConvolutionalProjection has to have odd radius"
-        
         #lets calculate edge correction factors:
         self.rad = int((numpy.shape(connection_kernel)[0]-1)/2)
         dim = self.target.unit_diameter
         cfs = [[self.connection_kernel[max(0,self.rad-j):2*self.rad+1-max(0,(j+1+self.rad)-dim),max(0,self.rad-i):2*self.rad+1-max(0,(i+1+self.rad)-dim)] for i in xrange(dim)] for j in xrange(dim)]
         self.corr_factors = numpy.array([[numpy.sum(numpy.abs(connection_kernel))/numpy.sum(numpy.abs(b)) for b in a] for a in cfs])
-        print numpy.max(self.corr_factors)
         
     def activate(self):
         """
         This returns a matrix of the same size as the target sheet, which corresponds to the contributions from this projections to the individual neurons.
         """
-        import pylab
         resp = scipy.signal.fftconvolve(self.source.get_activity(self.delay),self.connection_kernel, mode='same')
         assert numpy.shape(resp) == (self.target.unit_diameter,self.target.unit_diameter), "ERROR: The size of calculated projection respone is " + str(numpy.shape(resp)) + "units, while the size of target sheet is " + str((self.target.unit_diameter,self.target.unit_diameter)) + " units"
         self.activity = numpy.multiply(resp,self.corr_factors) * self.strength
-        #self.activity = resp * self.strength
