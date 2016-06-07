@@ -44,7 +44,8 @@ class Model(object):
               
               for s in self.sheets:
                   for p in s.in_projections:
-                      p.activate()
+                      if p.source.changed:
+                        p.activate()
                 
               for s in self.sheets:
                   s.update()
@@ -55,9 +56,9 @@ class Model(object):
           print("Ran network for " + str(time) + " seconds.")
          
       def reset(self):
- 		for s in self.sheets:
- 		    s.reset()	                    
-      
+          for s in self.sheets:
+              s.reset()	                    
+
     
 
 class Sheet(object):
@@ -65,24 +66,32 @@ class Sheet(object):
     This class represent a 2D matrix of units. 
     
     Note that:
-        1. all spatial parameters of the framework are in these units. 
-        2. all sheets are centered on each other
-        3. a consequence of 1 is that you cannot have sheets of different 'density'
+        All sheets are centered on each other.
     """
     
-    def __init__(self,name,radius,time_constant,threshold=0):
+    def __init__(self,name,size,density,time_constant,threshold=0):
         """
         Parameters
         ----------
-        radius : int
-                 The radius of the sheet in units. Thus the sheet will have radius*2 x radius*2 units.
+        size : float
+                 The size of the sheet in arbitrary units. Note that units will have coordinaes of -size/2, size/2
+        
+        density : float
+                 The density of the sheet. Thus the sheet will have round(size*density) x round(size*density) units.
+                 
+        time_constant:
+                 The time constant of the neurons in the sheet.
         
         threshold : float
                   The threshold of the units in the sheet.
         """
-        self.radius = radius
-        self.vm = numpy.zeros((2*radius,2*radius),dtype=numpy.float32)
-        self.threshold = threshold
+        self.size = size
+        self.density = density
+        assert density * (size/2) % 1 == 0, "Density of the sheet times radius (size/2) has to be integer, but %f * %f / 2 = %f" % (density,size,density * (size/2) )
+        self.unit_diameter = int(numpy.floor(self.size/2*self.density)*2)
+        self.changed=True
+        self.vm = numpy.zeros((self.unit_diameter,self.unit_diameter),dtype=numpy.float32)
+        self.threshold = numpy.ones(self.vm.shape)*threshold
         self.in_projections = []
         self.out_projections = []
         self.time_constant = time_constant
@@ -98,7 +107,7 @@ class Sheet(object):
         self.dt = dt
         self.buffer_index = 0
         self.buffer_depth = buffer_depth
-        self.activities = numpy.zeros((buffer_depth,2*self.radius,2*self.radius),dtype=numpy.float32)
+        self.activities = numpy.zeros((buffer_depth,self.unit_diameter,self.unit_diameter),dtype=numpy.float32)
         self.not_initialized = False
 
     
@@ -150,15 +159,118 @@ class Sheet(object):
         self.activities *= 0
         self.buffer_index = 0
         self.vm *= 0
+    
+    def index_to_coord(self,x,y):
+        """
+        Returns indexes of a unit at coordinates x and y.
+        """
         
+        assert x < self.unit_diameter and x >= 0, "Indexes out of bounds (%f). Asked for (%f,%f)" % (self.unit_diameter,x,y)
+        assert y < self.unit_diameter and y >= 0, "Indexes out of bounds (%f). Asked for (%f,%f)" % (self.unit_diameter,x,y)
+        coordx = (x - self.unit_diameter/2)/(self.density*1.0) + 1.0/(2.0*self.density)
+        coordy = (y - self.unit_diameter/2)/(self.density*1.0) + 1.0/(2.0*self.density)
+        return coordx,coordy
+    
+    def coord_to_index(self,x,y,clipped=False):
+        """
+        Returns coordinates of a unit at indexes x and y.
         
-class InputSheet(Sheet):
+        If clipped is true, if the coordinates are out of the bounds of the sheet, it will return
+        indexes that are clipped to the minimum or maximum allowed indexes. 
+        """
+        
+        if not clipped:
+            assert x >= -self.size / 2 and x <= self.size/2 , "Coordinates (%f,%f) out of bounds (%f,%f)" % (x,y,-self.size/2,self.size/2)
+            assert y >= -self.size / 2 and y <= self.size/2 , "Coordinates (%f,%f) out of bounds (%f,%f)" % (x,y,-self.size/2,self.size/2)
+        indexx = numpy.round(x*self.density - 1.0/(2*self.density)) + self.unit_diameter/2
+        indexy = numpy.round(y*self.density - 1.0/(2*self.density)) + self.unit_diameter/2
+        
+        if clipped:
+            if indexx < 0: indexx = 0
+            if indexy < 0: indexy = 0
+            if indexx > self.unit_diameter-1: indexx = self.unit_diameter-1
+            if indexy > self.unit_diameter-1: indexy = self.unit_diameter-1
+            
+        return indexx,indexy
+    
+class NoTimeconstantSheet(Sheet):
+    """
+    Same as Sheet, but activity is computed instantenously without taking into consideration time-constant or delays.
+    """
+        
+    
+    def __init__(self,name,size,density,time_constant,threshold=0):
+        """
+        Parameters
+        ----------
+        size : float
+                 The size of the sheet in arbitrary units. Note that units will have coordinaes of -size/2, size/2
+        
+        density : float
+                 The density of the sheet. Thus the sheet will have round(size*density) x round(size*density) units.
+                 
+        time_constant:
+                 The time constant of the neurons in the sheet.
+        
+        threshold : float
+                  The threshold of the units in the sheet.
+        """
+        self.size = size
+        self.density = density
+        assert density * (size/2) % 1 == 0, "Density of the sheet times radius (size/2) has to be integer, but %f * %f / 2 = %f" % (density,size,density * (size/2) )
+        self.unit_diameter = int(numpy.floor(self.size/2*self.density)*2)
+        self.changed=True
+        self.threshold = threshold
+        self.in_projections = []
+        self.out_projections = []
+        self.name = name
+        self.not_initialized = True
+   
+    
+    def _initialize(self,buffer_depth,dt):
+        """
+        Initializes sheet. Certain information is available onle once sheets are registered in the model.
+        This is done here.
+        """
+        assert self.not_initialized, "Sheet "+ self.name + " has already been initialized"
+        self.activities = numpy.zeros((self.unit_diameter,self.unit_diameter),dtype=numpy.float32)
+        self.not_initialized = False
+
+    
+    def get_activity(self,delay):
+        """
+        Return's sheet activity delay in the past (rounded to the nearest multiple of dt).
+        """
+        return self.activities
+    
+    def update(self):
+        assert not self.not_initialized
+        
+        # sum the activity comming from all projections
+        for p in self.in_projections:
+            self.activities += p.activity
+        
+        #apply the non-linearity    
+        self.activities = self.activities.clip(min=self.threshold)
+          
+        self.changed = sum([p.source.changed for p in self.in_projections])
+    
+    def reset(self):
+        """
+        Resets the sheet to be in the same state as after initialization (including he call to _initialize).
+        """
+        self.activities *= 0
+        
+class InputSheet(NoTimeconstantSheet):
     """
     Sheet for which you can set input. It cannot have any incomming connections.
     
     For now only time invariant input can be set.
     """
-    
+    def __init__(self,*params):
+        NoTimeconstantSheet.__init__(self,*params)
+        self.flag=True
+     
     def _register_projection(self,projection):
         """
         Registers projection as one of the input projection to the sheet.
@@ -166,23 +278,42 @@ class InputSheet(Sheet):
         raise Error, "Input sheet cannot accept incomming projections."
     
     def set_activity(self,activity):
-        assert numpy.shape(activity) == numpy.shape(self.activities[0])
-        for i in xrange(0,self.buffer_depth):
-            self.activities[i] = activity
+        self.flag=False
+        assert numpy.shape(activity) == numpy.shape(self.activities)
+        self.activities = activity
     
     def update(self):
-        pass
+        if self.flag == False:
+            self.changed=True
+            self.flag=True
+        else:
+            self.changed=False
 
-def applyHebianLearningStepOnAFastConnetcionFieldProjection(projection,learning_rate):
+
+class HomeostaticSheet(Sheet):
     """
-    This method when applied to a ConnetcionFieldProjection will perform a single step of hebbian learning with learning rate *learning_rate*.
+    Sheet with homeostatic control of activity of individual neurons.
     """
-    sa = projection.source.get_activity(projection.delay).ravel()
-    ta = projection.target.get_activity(0).ravel()
-    projection.cfs += learning_rate * numpy.dot(ta[:,numpy.newaxis],sa[numpy.newaxis,:])
-    projection.cfs = numpy.multiply(projection.cfs,projection.masks)
-    projection.cfs = projection.cfs / numpy.sum(numpy.abs(projection.cfs),axis=1)[:,numpy.newaxis]
     
+    def __init__(self,name,size,density,time_constant,init_threshold=0,alpha=0.001,mu=0.1):
+        """
+        Parameters
+        ----------
+        size : float
+                 The size of the sheet in arbitrary units. Note that units will have coordinaes of -size/2, size/2
+        
+        density : float
+                 The density of the sheet. Thus the sheet will have round(size*density) x round(size*density) units.
+                 
+        time_constant:
+                 The time constant of the neurons in the sheet.
+        
+        threshold : float
+                  The threshold of the units in the sheet.
+        """
+        Sheet.__init__(self,name,size,density,time_constant,init_threshold)
+        self.alpha = alpha
+        self.mu = mu
     
     
     

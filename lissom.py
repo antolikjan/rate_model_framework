@@ -4,6 +4,7 @@ from rate_model import *
 from projections import * 
 import imagen
 import imagen.random
+from imagen.transferfn import DivisiveNormalizeL1
 import numpy
 import pylab
 import numbergen
@@ -18,67 +19,76 @@ import sys
 
 
 # Sheets
-retina = InputSheet('Retina',45,0)
-lgn_on = Sheet('LGN_ON',35,0.001)
-lgn_off = Sheet('LGN_OFF',35,0.001)
-V1 = Sheet('V1',25,0.002,threshold=float(sys.argv[4]))
+retina = InputSheet('Retina',2.4,25,0)
+lgn_on = NoTimeconstantSheet('LGN_ON',1.6,25,0.001)
+lgn_off = NoTimeconstantSheet('LGN_OFF',1.6,25,0.001)
+V1 = Sheet('V1',1.0,50,0.002,threshold=float(sys.argv[4]))
 
 print sys.argv
 
 
 #Projections
-on = imagen.Gaussian(xdensity=17,ydensity=17,aspect_ratio=1.0,size=0.5/numpy.sqrt(2))()
-off =  imagen.Gaussian(xdensity=17,ydensity=17,aspect_ratio=1.0,size=2.0/numpy.sqrt(2))()
-lgn_mask = imagen.Disk(xdensity=17,ydensity=17,size=1.0,smoothing=0)()
-on = numpy.multiply(on,lgn_mask)
-off = numpy.multiply(off,lgn_mask)
-on = on/on.sum()
-off = off/off.sum()
-lgn_kernel_on = on - off
-lgn_kernel_on = lgn_kernel_on/ lgn_kernel_on.sum() 
-lgn_kernel_off = - lgn_kernel_on
+# DoG weights for the LGN
+centerg   = imagen.Gaussian(size=0.07385,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()])
+surroundg = imagen.Gaussian(size=0.29540,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()])
+on_weights = imagen.Composite(generators=[centerg,surroundg],operator=numpy.subtract)
+off_weights = imagen.Composite(generators=[surroundg,centerg],operator=numpy.subtract)
 
-retina_to_lgn_on = ConvolutionalProjection("RatinaToLgnOn",retina,lgn_on,1.0,0.001,lgn_kernel_on)
-retina_to_lgn_off = ConvolutionalProjection("RatinaToLgnOff",retina,lgn_off,1.0,0.001,lgn_kernel_off)
 
-lgn_to_V1_kernel = imagen.random.GaussianCloud(xdensity=21,ydensity=21,aspect_ratio=1.0,size=1.0)
-lgn_to_V1_mask = imagen.Disk(xdensity=21,ydensity=21,size=1.0,smoothing=0)()
-lgn_on_to_V1 = FastConnetcionFieldProjection("LGNOnToV1",lgn_on,V1,0.5,0.001,lgn_to_V1_kernel,mask=lgn_to_V1_mask)
-lgn_off_to_V1 = FastConnetcionFieldProjection("LGNOffToV1",lgn_off,V1,0.5,0.001,lgn_to_V1_kernel,mask=lgn_to_V1_mask)
+retina_to_lgn_on = FastConnetcionFieldProjection("RetinaToLgnOn",retina,lgn_on,1.0,0.001,0.375,on_weights)
+retina_to_lgn_off = FastConnetcionFieldProjection("RetinaToLgnOff",retina,lgn_off,1.0,0.001,0.375,off_weights)
 
-V1_lat_exc_kernel = imagen.Gaussian(xdensity=17,ydensity=17,aspect_ratio=1.0,size=0.5/numpy.sqrt(2))()
-V1_lat_inh_kernel = imagen.Gaussian(xdensity=17,ydensity=17,aspect_ratio=1.0,size=0.5)()
-lat_mask = imagen.Disk(xdensity=17,ydensity=17,size=1.0,smoothing=0)()
-V1_lat_exc_kernel = numpy.multiply(V1_lat_exc_kernel,lat_mask)
-V1_lat_inh_kernel = numpy.multiply(V1_lat_inh_kernel,lat_mask)
-V1_lat_exc_kernel = V1_lat_exc_kernel/V1_lat_exc_kernel.sum()
-V1_lat_inh_kernel = V1_lat_inh_kernel/V1_lat_inh_kernel.sum()
-V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,V1_lat_exc_kernel)
-V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,0.5*float(sys.argv[1])* float(sys.argv[2]),0.001,V1_lat_inh_kernel)
+lgn_on_to_V1 = FastConnetcionFieldProjection("LGNOnToV1",lgn_on,V1,0.5,0.001,0.27083,imagen.random.GaussianCloud(gaussian_size=2*0.27083))
+lgn_off_to_V1 = FastConnetcionFieldProjection("LGNOffToV1",lgn_off,V1,0.5,0.001,0.27083,imagen.random.GaussianCloud(gaussian_size=2*0.27083))
 
-#1.0*-3.45
+center_lat  = imagen.Gaussian(size=0.05,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()],xdensity=V1.density+1,ydensity=V1.density+1,bounds = BoundingBox(radius=V1.size/2.0))()
+surround_lat = imagen.Gaussian(size=0.15,aspect_ratio=1.0,output_fns=[DivisiveNormalizeL1()],xdensity=V1.density+1,ydensity=V1.density+1,bounds = BoundingBox(radius=V1.size/2.0))()
+center_lat = center_lat / numpy.sum(center_lat)
+surround_lat = surround_lat / numpy.sum(surround_lat)
+lat_kernel = center_lat - float(sys.argv[2])*surround_lat
+
+#V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,lat_kernel)
+
+#V1_lat_exc = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,center_lat)
+#V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,-0.5*float(sys.argv[1])*float(sys.argv[2]),0.001,surround_lat)
+
+V1_lat = ConvolutionalProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,0.104,imagen.Gaussian(aspect_ratio=1.0, size=0.05))
+#V1_lat_exc = FastConnetcionFieldProjection("LateralExc",V1,V1,0.5*float(sys.argv[1]),0.001,0.104,imagen.Gaussian(aspect_ratio=1.0, size=0.05))
+
+#V1_lat_inh = FastConnetcionFieldProjection("LateralInh",V1,V1,-0.5*float(sys.argv[1])*float(sys.argv[2]),0.001,0.22917,imagen.Gaussian(aspect_ratio=1.0, size=0.15))
 
 #Model initialization and execution
 lissom = Model([retina,lgn_on,lgn_off,V1],0.001)
 
-g1 = imagen.Gaussian(xdensity=retina.radius*2,ydensity=retina.radius*2,x=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=342),
+g1 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,x=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=342),
                      y=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=343),
                      orientation=numbergen.UniformRandom(lbound=-numpy.pi,ubound=numpy.pi,seed=333),
                      size=0.7*0.048388, aspect_ratio=1.2*4.66667, scale=1.0)
 
-g2 = imagen.Gaussian(xdensity=retina.radius*2,ydensity=retina.radius*2,x=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=312),
+g2 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,x=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=312),
 		     y=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=313),
                      orientation=numbergen.UniformRandom(lbound=-numpy.pi,ubound=numpy.pi,seed=322),
                      size=0.7*0.048388, aspect_ratio=1.2*4.66667, scale=1.0)
         
         
-run_for =10000
+run_for = 1
 t = time.time()
 for i in xrange(run_for):
     retina.set_activity(numpy.maximum(g1(),g2()))
     lissom.run(0.15)
-    applyHebianLearningStepOnAFastConnetcionFieldProjection(lgn_on_to_V1,float(sys.argv[3]))
-    applyHebianLearningStepOnAFastConnetcionFieldProjection(lgn_off_to_V1,float(sys.argv[3]))
+    #pylab.figure();display_model_state(lissom);
+    #lissom.run(0.15)
+    pylab.figure();display_model_state(lissom);
+    
+    
+    
+    #pylab.figure();plot_projection(lgn_on_to_V1,downsample=0.5)
+    #pylab.figure();plot_projection(retina_to_lgn_off,filename="RatinaToLgnOff.png")
+    pylab.show()
+    
+    
+    lgn_on_to_V1.applyHebianLearningStep(float(sys.argv[3]))
+    lgn_off_to_V1.applyHebianLearningStep(float(sys.argv[3]))
     print i , ":", "Expected time to run: " , ((time.time()-t)/(i+1)) * (run_for-i) , "s"
     if i == run_for-1:
        pylab.figure();display_model_state(lissom,filename="activity.png")

@@ -21,11 +21,10 @@ def display_model_state(model,filename=None):
             pylab.title(model.sheets[i].in_projections[j].name)
             im = pylab.imshow(model.sheets[i].in_projections[j].activity,cmap='gray',interpolation='nearest')
             pylab.colorbar(im,fraction=0.046, pad=0.04)
+            pylab.axis('off')
         
     if filename != None:
         pylab.savefig(filename,dpi=200)
-    
-    #pylab.tight_layout()
 
 
 def plot_projection(projection,downsample=0.2,filename=None):
@@ -33,7 +32,7 @@ def plot_projection(projection,downsample=0.2,filename=None):
     Plots the connection fields in the projection. Only *downsample* fraction (evenly spaced) of the connection fields will be shown
     """
     
-    size = int(numpy.floor(numpy.floor(2*projection.target.radius * downsample)))
+    size = int(numpy.floor(numpy.floor(projection.target.unit_diameter * downsample)))
     
     step = int(numpy.round(1/downsample))
     
@@ -48,6 +47,3 @@ def plot_projection(projection,downsample=0.2,filename=None):
     
     if filename != None:
         pylab.savefig(filename,dpi=200)
-    #pylab.tight_layout()
-            
-        
