@@ -78,8 +78,6 @@ for i in xrange(run_for):
     #pylab.figure();display_model_state(lissom);
     #pylab.figure();plot_projection(lgn_on_to_V1,downsample=0.5)
     #pylab.figure();plot_projection(retina_to_lgn_off,filename="RatinaToLgnOff.png")
-    #pylab.figure();display_model_state(lissom,filename="activity.png"); pylab.show()
-    
     
     lgn_on_to_V1.applyHebianLearningStep(float(sys.argv[3]))
     lgn_off_to_V1.applyHebianLearningStep(float(sys.argv[3]))
@@ -104,9 +102,9 @@ plot_projection(lgn_off_to_V1,filename="offProjection.png")
 pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=[V1],num_orientation=8,num_phase=10,duration=0.02,frequency=5.0,filename="freq=5",reset=True,plot=True,load=False)
 pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=[V1],num_orientation=8,num_phase=10,duration=0.02,frequency=10.0,filename="freq=10",reset=True,plot=True,load=False)
 
+pylab.show()
 
-
-if True:
+if False:
     pylab.figure()
     plot_projection(lgn_on_to_V1)
     pylab.figure()
