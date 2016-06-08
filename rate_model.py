@@ -302,7 +302,7 @@ class HomeostaticSheet(Sheet):
     Sheet with homeostatic control of activity of individual neurons.
     """
     
-    def __init__(self,name,size,density,time_constant,init_threshold=0,alpha=0.001,mu=0.1):
+    def __init__(self,name,size,density,time_constant,init_threshold=0,alpha=0.001,mu=0.1,smoothing=0.1):
         """
         Parameters
         ----------
@@ -320,46 +320,12 @@ class HomeostaticSheet(Sheet):
         """
         Sheet.__init__(self,name,size,density,time_constant,init_threshold)
         self.alpha = alpha
+        self.smoothing = smoothing
         self.mu = mu
-    
-    
-    
+        self.y_avg = numpy.ones((self.unit_diameter,self.unit_diameter),dtype=numpy.float32) * self.mu
 
-    def _update_threshold(self, prev_t, x, prev_avg, smoothing, learning_rate, target_activity):
-        """
-        Applies exponential smoothing to the given current activity and previous
-        smoothed value following the equations given in the report cited above.
-        """
-        y_avg = (1.0-smoothing)*x + smoothing*prev_avg
-        t = prev_t + learning_rate * (y_avg - target_activity)
-        return (y_avg, t)
-
-
-    def __call__(self,x):
-        """Initialises on the first call and then applies homeostasis."""
-        if self.first_call: self._initialize(x); self.first_call = False
-
-        if (topo.sim.time() > self._next_update_timestamp):
-            self._next_update_timestamp += self.period
-            # Using activity matrix and and smoothed activity from *previous* call.
-            (self.y_avg, self.t) = self._update_threshold(self.t, self._x_prev, self._y_avg_prev,
-                                                          self.smoothing, self.learning_rate,
-                                                          self.target_activity)
-            self._y_avg_prev = self.y_avg   # Copy only if not in continuous mode
-
-        self._apply_threshold(x)            # Apply the threshold only after it is updated
-        self._x_prev[...,...] = x[...,...]  # Recording activity for the next periodic update
-
-    def _initialize(self,x):
-        self._x_prev = numpy.copy(x)
-        self._y_avg_prev = ones(x.shape, x.dtype.char) * self.target_activity
-
-        if self.randomized_init:
-            self.t = ones(x.shape, x.dtype.char) * self.t_init + \
-                (topo.pattern.random.UniformRandom( \
-                    random_generator=numpy.random.RandomState(seed=self.seed)) \
-                     (xdensity=x.shape[0],ydensity=x.shape[1]) \
-                     -0.5)*self.noise_magnitude*2
-        else:
-            self.t = ones(x.shape, x.dtype.char) * self.t_init
-        self.y_avg = ones(x.shape, x.dtype.char) * self.target_activity
+    def applyHomeostaticThrehs(self,x):
+        # Using activity matrix and and smoothed activity from *previous* call.    
+        self.y_avg = (1.0-self.smoothing)*x + self.smoothing*self.y_avg
+        self.threshold = self.threshold + self.alpha * (self.y_avg - self.mu)
+        
