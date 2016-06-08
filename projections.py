@@ -110,7 +110,7 @@ class FastConnetcionFieldProjection(Projection):
         ci,cj = self.target.index_to_coord(posx,posy)
         xi,yi = self.source.coord_to_index(ci-self.radius,cj-self.radius,clipped=True)
         xa,ya = self.source.coord_to_index(ci+self.radius,cj+self.radius,clipped=True)
-        return numpy.reshape(self.cfs[posx*self.target.unit_diameter+posy,:],(self.source.unit_diameter,self.source.unit_diameter))#[xi:xa,yi:ya]
+        return numpy.reshape(self.cfs[posx*self.target.unit_diameter+posy,:],(self.source.unit_diameter,self.source.unit_diameter))[xi:xa,yi:ya]
         
     def applyHebianLearningStep(self,learning_rate):
         """

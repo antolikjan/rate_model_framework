@@ -19,9 +19,9 @@ import sys
 
 
 # Sheets
-retina = InputSheet('Retina',2.4,25,0)
-lgn_on = NoTimeconstantSheet('LGN_ON',1.6,25,0.001)
-lgn_off = NoTimeconstantSheet('LGN_OFF',1.6,25,0.001)
+retina = InputSheet('Retina',2.4,25,None)
+lgn_on = NoTimeconstantSheet('LGN_ON',1.6,25,None)
+lgn_off = NoTimeconstantSheet('LGN_OFF',1.6,25,None)
 V1 = Sheet('V1',1.0,50,0.002,threshold=float(sys.argv[4]))
 
 print sys.argv
@@ -73,6 +73,7 @@ t = time.time()
 for i in xrange(run_for):
     retina.set_activity(numpy.maximum(g1(),g2()))
     lissom.run(0.15)
+    #pylab.figure();display_model_state(lissom,filename="activity.png");pylab.show()
     #pylab.figure();display_model_state(lissom);pylab.show()
     #lissom.run(0.15)
     #pylab.figure();display_model_state(lissom);

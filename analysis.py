@@ -28,8 +28,8 @@ def fullfieldSineGratingOrientationTuningProtocol(model,retina,sheets=None,num_o
         #present the stimulation protocol and collect data
         for i in xrange(num_orientation):
             for j in xrange(num_phase):
-                for s in sheets:
-                    if reset:
+                if reset:
+                    for s in model.sheets:
                         s.reset()
 
                 stim = SineGrating(orientation=numpy.pi/num_orientation*i,phase=numpy.pi*2/num_phase*j,xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,frequency=frequency,scale=scale)()
