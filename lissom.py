@@ -22,7 +22,8 @@ import sys
 retina = InputSheet('Retina',2.4,25,None)
 lgn_on = NoTimeconstantSheet('LGN_ON',1.6,25,None)
 lgn_off = NoTimeconstantSheet('LGN_OFF',1.6,25,None)
-V1 = Sheet('V1',1.0,50,0.002,threshold=float(sys.argv[4]))
+#V1 = Sheet('V1',1.0,50,0.002,threshold=float(sys.argv[4]))
+V1 = HomeostaticSheet('V1',1.0,50,0.002,init_threshold=float(sys.argv[4]),mu=float(sys.argv[5]))
 
 print sys.argv
 
@@ -54,13 +55,13 @@ V1_lat_inh = ConvolutionalProjection("LateralInh",V1,V1,-0.5*float(sys.argv[1])*
 #Model initialization and execution
 lissom = Model([retina,lgn_on,lgn_off,V1],0.001)
 
-g1 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,x=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=342),
-                     y=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=343),
+g1 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,x=numbergen.UniformRandom(lbound=-0.3,ubound=0.3,seed=342),
+                     y=numbergen.UniformRandom(lbound=-0.3,ubound=0.3,seed=343),
                      orientation=numbergen.UniformRandom(lbound=-numpy.pi,ubound=numpy.pi,seed=333),
                      size=0.7*0.048388, aspect_ratio=1.2*4.66667, scale=1.0)
 
-g2 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,x=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=312),
-		     y=numbergen.UniformRandom(lbound=-0.4,ubound=0.4,seed=313),
+g2 = imagen.Gaussian(xdensity=retina.unit_diameter,ydensity=retina.unit_diameter,x=numbergen.UniformRandom(lbound=-0.3,ubound=0.3,seed=312),
+		     y=numbergen.UniformRandom(lbound=-0.3,ubound=0.3,seed=313),
                      orientation=numbergen.UniformRandom(lbound=-numpy.pi,ubound=numpy.pi,seed=322),
                      size=0.7*0.048388, aspect_ratio=1.2*4.66667, scale=1.0)
         
@@ -95,13 +96,13 @@ if True:
     f.close()
     
 pylab.figure()
-plot_projection(lgn_on_to_V1,filename="onProjection.png")
+plot_projection(lgn_on_to_V1,filename="onProjection.png",downsample=0.5)
 
 pylab.figure()
-plot_projection(lgn_off_to_V1,filename="offProjection.png")
+plot_projection(lgn_off_to_V1,filename="offProjection.png",downsample=0.5)
 
+pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=[V1],num_orientation=8,num_phase=10,duration=0.02,frequency=4.0,filename="freq=4",reset=True,plot=True,load=False)
 pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=[V1],num_orientation=8,num_phase=10,duration=0.02,frequency=5.0,filename="freq=5",reset=True,plot=True,load=False)
-pylab.figure();fullfieldSineGratingOrientationTuningProtocol(lissom,retina,sheets=[V1],num_orientation=8,num_phase=10,duration=0.02,frequency=10.0,filename="freq=10",reset=True,plot=True,load=False)
 
 pylab.show()
 

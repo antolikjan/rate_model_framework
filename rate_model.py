@@ -302,7 +302,7 @@ class HomeostaticSheet(Sheet):
     Sheet with homeostatic control of activity of individual neurons.
     """
     
-    def __init__(self,name,size,density,time_constant,init_threshold=0,alpha=0.001,mu=0.1,smoothing=0.1):
+    def __init__(self,name,size,density,time_constant,init_threshold=0,alpha=0.01,mu=0.1,smoothing=0.991):
         """
         Parameters
         ----------
@@ -324,8 +324,8 @@ class HomeostaticSheet(Sheet):
         self.mu = mu
         self.y_avg = numpy.ones((self.unit_diameter,self.unit_diameter),dtype=numpy.float32) * self.mu
 
-    def applyHomeostaticThrehs(self,x):
+    def applyHomeostaticThresh(self):
         # Using activity matrix and and smoothed activity from *previous* call.    
-        self.y_avg = (1.0-self.smoothing)*x + self.smoothing*self.y_avg
+        self.y_avg = (1.0-self.smoothing)*self.get_activity(self.dt) + self.smoothing*self.y_avg
         self.threshold = self.threshold + self.alpha * (self.y_avg - self.mu)
         
