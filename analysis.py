@@ -7,18 +7,32 @@ import pylab
 import pickle
 
 from imagen import SineGrating
+from typing import List
+
+from rate_model import Model, InputSheet, HomeostaticSheet
 
 
-def fullfield_sine_grating_orientation_tuning_protocol(model, retina, sheets=None,
-                                                       num_orientation=8, num_phase=10, duration=0.04, frequency=2.4,
-                                                       scale=1.0, filename=None, plot=False, load=False, reset=False):
+def fullfield_sine_grating_orientation_tuning_protocol(
+    model: Model,
+    retina: InputSheet,
+    sheets: List[HomeostaticSheet] = None,
+    num_orientation: int = 8,
+    num_phase: int = 10,
+    duration: float = 0.04,
+    frequency: float = 2.4,
+    scale: float = 1.0,
+    filename: str = None,
+    plot: bool = False,
+    load: bool = False,
+    reset: bool = False,
+) -> tuple[dict, dict]:
     """
     This analysis will present fullfield sine grating orientation tuning protocol to the model *model*.
-    
+
     It will collect the final activation of neurons in sheets *sheets* (if None all sheets in the model are analyzed)
     and compute orientation tuning preference and
     selectivity for the neurons in these sheets.
-    
+
     If filename is not None it will save the collected data to file, filename
     """
     if not load:
@@ -29,7 +43,9 @@ def fullfield_sine_grating_orientation_tuning_protocol(model, retina, sheets=Non
 
         # initialize the
         for sheet in sheets:
-            responses[sheet.name] = numpy.zeros((num_orientation, num_phase, sheet.unit_diameter ** 2))
+            responses[sheet.name] = numpy.zeros(
+                (num_orientation, num_phase, sheet.unit_diameter ** 2)
+            )
 
         # present the stimulation protocol and collect data
         for i in range(num_orientation):
@@ -38,20 +54,27 @@ def fullfield_sine_grating_orientation_tuning_protocol(model, retina, sheets=Non
                     for sheet in model.sheets:
                         sheet.reset()
 
-                stim = SineGrating(orientation=numpy.pi / num_orientation * i, phase=numpy.pi * 2 / num_phase * j,
-                                   xdensity=retina.unit_diameter, ydensity=retina.unit_diameter, frequency=frequency,
-                                   scale=scale)()
+                stim = SineGrating(
+                    orientation=numpy.pi / num_orientation * i,
+                    phase=numpy.pi * 2 / num_phase * j,
+                    xdensity=retina.unit_diameter,
+                    ydensity=retina.unit_diameter,
+                    frequency=frequency,
+                    scale=scale,
+                )()
                 retina.set_activity(stim)
                 model.run(duration)
                 for sheet in sheets:
-                    responses[sheet.name][i, j, :] = sheet.get_activity(model.dt).copy().ravel()
+                    responses[sheet.name][i, j, :] = (
+                        sheet.get_activity(model.dt).copy().ravel()
+                    )
 
         if filename is not None:
-            f = open(filename + "_resp.pickle", 'wb')
+            f = open(filename + "_resp.pickle", "wb")
             pickle.dump(responses, f)
             f.close()
     else:
-        f = open(filename + "_resp.pickle", 'rb')
+        f = open(filename + "_resp.pickle", "rb")
         responses = pickle.load(f)
         f.close()
 
@@ -71,7 +94,11 @@ def fullfield_sine_grating_orientation_tuning_protocol(model, retina, sheets=Non
         for i in range(len(angles)):
             if i > 0:
                 pylab.subplot(1, len(angles), i)
-                pylab.imshow(numpy.reshape(response[i], (int(sheet_size), int(sheet_size))), interpolation='none', cmap='gray')
+                pylab.imshow(
+                    numpy.reshape(response[i], (int(sheet_size), int(sheet_size))),
+                    interpolation="none",
+                    cmap="gray",
+                )
                 pylab.colorbar()
 
         # calculate selectivity and preference as the angle and magnitude of the mean of the responses projected
@@ -80,7 +107,9 @@ def fullfield_sine_grating_orientation_tuning_protocol(model, retina, sheets=Non
         polar_resp = response * numpy.array(angles_as_complex_numbers)[:, numpy.newaxis]
         polar_mean_resp = numpy.mean(polar_resp, axis=0)
 
-        orientation_preference_maps[sheet] = (numpy.angle(polar_mean_resp) + 4 * numpy.pi) % (numpy.pi * 2)
+        orientation_preference_maps[sheet] = (
+            numpy.angle(polar_mean_resp) + 4 * numpy.pi
+        ) % (numpy.pi * 2)
         orientation_selectivity_maps[sheet] = numpy.absolute(polar_mean_resp)
 
     pylab.savefig(filename + "_or_resps.png", dpi=200)
@@ -94,15 +123,29 @@ def fullfield_sine_grating_orientation_tuning_protocol(model, retina, sheets=Non
         for i, sheet in enumerate(responses.keys()):
             sheet_size = numpy.sqrt(len(orientation_preference_maps[sheet]))
             pylab.subplot(gs[0, i])
-            im = pylab.imshow(numpy.resize(orientation_preference_maps[sheet], (int(sheet_size), int(sheet_size))), vmin=0,
-                              vmax=2 * numpy.pi, interpolation='nearest', cmap='hsv')
-            pylab.axis('off')
+            im = pylab.imshow(
+                numpy.resize(
+                    orientation_preference_maps[sheet],
+                    (int(sheet_size), int(sheet_size)),
+                ),
+                vmin=0,
+                vmax=2 * numpy.pi,
+                interpolation="nearest",
+                cmap="hsv",
+            )
+            pylab.axis("off")
             pylab.colorbar(im, fraction=0.046, pad=0.04)
 
             pylab.subplot(gs[1, i])
-            im = pylab.imshow(numpy.resize(orientation_selectivity_maps[sheet], (int(sheet_size), int(sheet_size))),
-                              interpolation='nearest', cmap='gray')
-            pylab.axis('off')
+            im = pylab.imshow(
+                numpy.resize(
+                    orientation_selectivity_maps[sheet],
+                    (int(sheet_size), int(sheet_size)),
+                ),
+                interpolation="nearest",
+                cmap="gray",
+            )
+            pylab.axis("off")
             pylab.colorbar(im, fraction=0.046, pad=0.04)
 
         pylab.savefig(filename + "_maps.png", dpi=200)

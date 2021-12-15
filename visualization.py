@@ -3,7 +3,7 @@ import matplotlib.gridspec as gridspec
 import numpy
 
 
-def display_model_state(model, filename=None):
+def display_model_state(model, filename: str = None) -> None:
     # find the longest number of projections
     max_num_in_projections = 0
     for s in model.sheets:
@@ -13,21 +13,35 @@ def display_model_state(model, filename=None):
     for i in range(len(model.sheets)):
         pylab.subplot(max_num_in_projections + 1, len(model.sheets), i + 1)
         pylab.title(model.sheets[i].name)
-        im = pylab.imshow(model.sheets[i].get_activity(model.dt), cmap='gray', interpolation='nearest')
+        im = pylab.imshow(
+            model.sheets[i].get_activity(model.dt), cmap="gray", interpolation="nearest"
+        )
         pylab.colorbar(im, fraction=0.046, pad=0.04)
 
         for j in range(len(model.sheets[i].in_projections)):
-            pylab.subplot(max_num_in_projections + 1, len(model.sheets), len(model.sheets) * (j + 1) + i + 1)
+            pylab.subplot(
+                max_num_in_projections + 1,
+                len(model.sheets),
+                len(model.sheets) * (j + 1) + i + 1,
+            )
             pylab.title(model.sheets[i].in_projections[j].name)
-            im = pylab.imshow(model.sheets[i].in_projections[j].activity, cmap='gray', interpolation='nearest')
+            im = pylab.imshow(
+                model.sheets[i].in_projections[j].activity,
+                cmap="gray",
+                interpolation="nearest",
+            )
             pylab.colorbar(im, fraction=0.046, pad=0.04)
-            pylab.axis('off')
+            pylab.axis("off")
 
     if filename is not None:
         pylab.savefig(filename, dpi=200)
 
 
-def plot_projection(projection, downsample=0.2, filename=None):
+def plot_projection(
+    projection,
+    downsample: float = 0.2,
+    filename: str = None,
+) -> None:
     """
     Plots the connection fields in the projection.
     Only *downsample* fraction (evenly spaced) of the connection fields will be shown
@@ -43,8 +57,12 @@ def plot_projection(projection, downsample=0.2, filename=None):
     for i in range(size):
         for j in range(size):
             pylab.subplot(gs[int(i), int(j)])
-            pylab.imshow(projection.get_cf(i * step, j * step), interpolation='nearest', cmap='gray')
-            pylab.axis('off')
+            pylab.imshow(
+                projection.get_cf(i * step, j * step),
+                interpolation="nearest",
+                cmap="gray",
+            )
+            pylab.axis("off")
 
     if filename is not None:
         pylab.savefig(filename, dpi=200)
