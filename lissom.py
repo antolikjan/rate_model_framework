@@ -11,18 +11,14 @@ import pylab
 import pickle
 import numbergen
 
-from constants import THRESHOLD, STRENGTH_OF_CONNECTION, RUNTIME
-
-# parameters
-# aff_ratio, inh_ratio, lr, threshold
-
+from constants import THRESHOLD, STRENGTH_OF_CONNECTION, RUNTIME, MU
 
 # Sheets
 retina = InputSheet("Retina", 2.4, 25, None)
 lgn_on = NoTimeConstantSheet("LGN_ON", 1.6, 25, None)
 lgn_off = NoTimeConstantSheet("LGN_OFF", 1.6, 25, None)
 # V1 = Sheet('V1',1.0,50,0.002,threshold=float(sys.argv[4]))
-V1 = HomeostaticSheet("V1", 1.0, 50, 0.002, init_threshold=THRESHOLD)
+V1 = HomeostaticSheet("V1", 1.0, 50, 0.002, init_threshold=THRESHOLD, mu=MU)
 
 # Projections
 # DoG weights for the LGN
