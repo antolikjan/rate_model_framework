@@ -2,17 +2,25 @@ import pylab
 import matplotlib.gridspec as gridspec
 import numpy
 
+from logger import setup_main_logger
+
 
 def display_model_state(model, filename: str = None) -> None:
+    logger = setup_main_logger()
     # find the longest number of projections
     max_num_in_projections = 0
     for s in model.sheets:
         max_num_in_projections = max(max_num_in_projections, len(s.in_projections))
     pylab.subplot(max_num_in_projections + 1, len(model.sheets), 1)
 
+    logger.info(f"model sheets {str(model.sheets)}")
+
     for i in range(len(model.sheets)):
+        logger.info(f"max_num_in_projections + 1, len(model.sheets), i + 1 {max_num_in_projections + 1, len(model.sheets), i + 1}")
         pylab.subplot(max_num_in_projections + 1, len(model.sheets), i + 1)
         pylab.title(model.sheets[i].name)
+        logger.info(f"name {model.sheets[i].name}")
+        logger.info(f"model.sheets get activity {str(model.sheets[i].get_activity(model.dt))}")
         im = pylab.imshow(
             model.sheets[i].get_activity(model.dt), cmap="gray", interpolation="nearest"
         )

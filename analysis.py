@@ -25,7 +25,7 @@ def fullfield_sine_grating_orientation_tuning_protocol(
     plot: bool = False,
     load: bool = False,
     reset: bool = False,
-) -> tuple[dict, dict]:
+):
     """
     This analysis will present fullfield sine grating orientation tuning protocol to the model *model*.
 

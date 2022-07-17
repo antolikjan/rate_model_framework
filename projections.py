@@ -8,6 +8,7 @@ from scipy import signal
 
 from rate_model import InputSheet, NoTimeConstantSheet, HomeostaticSheet
 
+numpy.set_printoptions(precision=20)
 
 class Projection(object):
     """
@@ -137,6 +138,8 @@ class FastConnectionFieldProjection(Projection):
         hebbian learning with learning rate *learning_rate*.
         """
         sa = self.source.get_activity(self.delay).ravel()
+        print("delay: ", self.delay)
+        print("sa: ", sa)
         ta = self.target.get_activity(self.target.dt).ravel()
         self.cfs += learning_rate * numpy.dot(
             ta[:, numpy.newaxis], sa[numpy.newaxis, :]

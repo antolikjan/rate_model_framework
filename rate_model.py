@@ -171,7 +171,7 @@ class Sheet(object):
         self.tmp_changed = True
         self.changed = True
 
-    def index_to_coord(self, x: int, y: int) -> tuple[float, float]:
+    def index_to_coord(self, x: int, y: int):
         """
         Returns indexes of a unit at coordinates x and y.
         """
@@ -190,7 +190,7 @@ class Sheet(object):
         )
         return coord_x, coord_y
 
-    def coord_to_index(self, x: float, y: float, clipped: bool = False) -> tuple[int, int]:
+    def coord_to_index(self, x: float, y: float, clipped: bool = False):
         """
         Returns coordinates of a unit at indexes x and y.
 
@@ -324,7 +324,7 @@ class InputSheet(NoTimeConstantSheet):
         raise Exception("Input sheet cannot accept incoming projections.")
 
     def set_activity(self, activity: SineGrating) -> None:
-        assert numpy.shape(activity) == numpy.shape(self.activities)
+ #       assert numpy.shape(activity) == numpy.shape(self.activities)
         self.activities = activity
         self.tmp_changed = True
         self.changed = True
