@@ -1,20 +1,67 @@
 """
 This file contains analysis protocols.
 """
+import os
+import random
+from typing import Dict, List
+
 import matplotlib.gridspec as gridspec
 import numpy
+import numpy as np
 from imagen import SineGrating
 import pylab
 
+from rate_model import NoTimeconstantSheet, InputSheet
 from skin_parser.logger import setup_main_logger
+
+TIMESTAMP_POSITION = 2
+FIRST_TAXEL_POSITION = 3
+FILEPATH = f"{os.getcwd()}\\data.log"
+
+class InputSheetSkin(NoTimeconstantSheet):
+#class InputSheetSkin():
+    """
+    Skin sheet.
+    """
+
+    skin_data: Dict[str, List[str]]
+
+    def __init__(
+        self, filepath,
+    ):
+        self.filepath = filepath
+        self.skin_data = {}
+
+    def load_data(self):
+        with open(self.filepath) as data_file:
+            for line in data_file.readlines():
+                line = line.split()
+                no_of_data_points = len(line[FIRST_TAXEL_POSITION:])
+                self.skin_data[line[TIMESTAMP_POSITION]] = np.array([float(i) for i in line[FIRST_TAXEL_POSITION:]])
+                #self.skin_data[line[TIMESTAMP_POSITION]] = np.expand_dims(self.skin_data[line[TIMESTAMP_POSITION]], axis=0)
+
+    def load_data_in_2D(self):
+        with open(self.filepath) as data_file:
+            for line in data_file.readlines():
+                line = line.split()
+                self.skin_data[line[TIMESTAMP_POSITION]] = self.chunks(line[FIRST_TAXEL_POSITION:], 28)
+
+    def set_activity(self, activity):
+        self.activities = activity
+        self.tmp_changed = True
+        self.changed = True
+
+    def update(self):
+        self.tmp_changed = False
 
 
 def fullfieldSineGratingOrientationTuningProtocol(
     model,
     retina,
+    skin: InputSheet,
     sheets=None,
-    num_orientation=8,
-    num_phase=10,
+    num_orientation=100,
+    num_phase=100,
     duration=0.04,
     frequency=2.4,
     scale=1.0,
@@ -32,6 +79,12 @@ def fullfieldSineGratingOrientationTuningProtocol(
     If filename is not None it will save the collected data to file, filename
     """
     logger = setup_main_logger()
+    logger.info(f"skin = {skin}")
+    skin = InputSheetSkin(FILEPATH)
+    skin.load_data()
+    skin = list(skin.skin_data.values())
+    #logger.info(f"defskin = {skin}")
+
     if not load:
         responses = {}
 
@@ -51,20 +104,32 @@ def fullfieldSineGratingOrientationTuningProtocol(
                     for s in model.sheets:
                         s.reset()
 
-                stim = SineGrating(
-                    orientation=numpy.pi / num_orientation * i,
-                    phase=numpy.pi * 2 / num_phase * j,
-                    xdensity=retina.unit_diameter,
-                    ydensity=retina.unit_diameter,
-                    frequency=frequency,
-                    scale=scale,
-                )()
-                logger.info(f"stim = {stim}")
+                # stim = SineGrating(
+                #     orientation=numpy.pi / num_orientation * i,
+                #     phase=numpy.pi * 2 / num_phase * j,
+                #     xdensity=retina.unit_diameter,
+                #     ydensity=retina.unit_diameter,
+                #     frequency=frequency,
+                #     scale=scale,
+                # )()
+                stim_number = random.randint(0, len(skin))
+                #logger.info(f"stimnumber = {stim_number}")
+                stim = skin[stim_number]
+                #logger.info(f"stim = {stim}")
                 retina.set_activity(stim)
-                logger.info(f"activity = {retina.get_activity(1)}")
+                #logger.info(f"retina activity {retina.get_activity(model.dt)}")
                 model.run(duration)
-                for s in sheets:
-                    responses[s.name][i, j, :] = s.get_activity(model.dt).copy().ravel()
+                for sheet in sheets:
+                    logger.info(f"sheets {sheets}")
+                    responses[sheet.name][i, j, :] = (
+                        retina.get_activity(model.dt).copy().ravel()
+                    )
+                    # responses[sheet.name][i, j, :] = (
+                    #     sheet.get_activity(model.dt).copy().ravel()
+                    # )
+                    logger.info(f"responses {str(responses)}")
+
+            #logger.info(f"responses {str(responses)}")
 
         if filename != None:
             import pickle
@@ -90,6 +155,7 @@ def fullfieldSineGratingOrientationTuningProtocol(
     for k in responses.keys():
         # first let's select the response to each orientation as the maximum response across phases
         resp = numpy.max(responses[k], axis=1)
+        logger.info(f"resp {resp}")
 
         sheet_size = numpy.sqrt(len(resp[0]))
         for i in range(len(angles)):

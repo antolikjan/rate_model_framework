@@ -349,7 +349,7 @@ class InputSheet(NoTimeconstantSheet):
         # raise Error, "Input sheet cannot accept incomming projections."
 
     def set_activity(self, activity):
-        assert numpy.shape(activity) == numpy.shape(self.activities)
+        #assert numpy.shape(activity) == numpy.shape(self.activities)
         self.activities = activity
         self.tmp_changed = True
         self.changed = True
