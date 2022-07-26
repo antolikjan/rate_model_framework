@@ -55,7 +55,6 @@ class Model(object):
 class Sheet(object):
     """
     This class represent a 2D matrix of units.
-
     Note that:
         All sheets are centered on each other.
     """
@@ -193,7 +192,6 @@ class Sheet(object):
     def coord_to_index(self, x: float, y: float, clipped: bool = False):
         """
         Returns coordinates of a unit at indexes x and y.
-
         If clipped is true, if the coordinates are out of the bounds of the sheet, it will return
         indexes that are clipped to the minimum or maximum allowed indexes.
         """
@@ -310,7 +308,6 @@ class NoTimeConstantSheet(Sheet):
 class InputSheet(NoTimeConstantSheet):
     """
     Sheet for which you can set input. It cannot have any incoming connections.
-
     For now only time invariant input can be set.
     """
 

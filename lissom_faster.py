@@ -112,16 +112,10 @@ g2 = imagen.Gaussian(
     aspect_ratio=1.2 * 4.66667,
     scale=1.0,
 )
-print(g1)
-print(g2)
-m = numpy.maximum(g1(), g2())
-print(m)
 
-run_for = 10000
+run_for = 10
 t = time.time()
 for i in range(run_for):
-    print(g1)
-    print(g2)
     retina.set_activity(numpy.maximum(g1(), g2()))
     lissom.run(0.05)
 

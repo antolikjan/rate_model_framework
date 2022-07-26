@@ -51,7 +51,6 @@ class FastConnectionFieldProjection(Projection):
     on the target's neuron position.
     This means that the output of ConvolutionalProjection is the spatial convolution of this connection kernel with
     the activities of the source Sheet.
-
     Note that all connection fields, including the border ones, will be normalized so that
     the sum of their absolute values is 1.
     """
@@ -154,9 +153,7 @@ class ConvolutionalProjection(Projection):
     for all target neurons, except being centered on their position.
     This means that the output of ConvolutionalProjection is the spatial convolution of this connection
     kernel with the activities of the source Sheet.
-
     Note that the connection_kernel will be normalized so that the sum of it's absolute values is 1.
-
     ConvolutionalProjection is only allowed between sheets of the same size and density.
     """
 

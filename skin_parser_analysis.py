@@ -1,17 +1,63 @@
 """
 This file contains analysis protocols.
 """
+import os
+
 import matplotlib.gridspec as gridspec
 import numpy
+import numpy as np
 import pylab
 import pickle
+import random
 
 from imagen import SineGrating
-from typing import List
+from typing import List, Dict
 
 from logger import setup_main_logger
-from rate_model import Model, InputSheet, HomeostaticSheet
+from rate_model import Model, InputSheet, HomeostaticSheet, NoTimeConstantSheet
 
+TIMESTAMP_POSITION = 2
+FIRST_TAXEL_POSITION = 3
+FILEPATH = f"{os.getcwd()}\\data.txt"
+
+np.set_printoptions(precision=20)
+
+
+class InputSheetSkin(NoTimeConstantSheet):
+#class InputSheetSkin():
+    """
+    Skin sheet.
+    """
+
+    skin_data: Dict[str, List[str]]
+
+    def __init__(
+        self, filepath,
+    ):
+        self.filepath = filepath
+        self.skin_data = {}
+
+    def load_data(self):
+        with open(self.filepath) as data_file:
+            for line in data_file.readlines():
+                line = line.split()
+                no_of_data_points = len(line[FIRST_TAXEL_POSITION:])
+                self.skin_data[line[TIMESTAMP_POSITION]] = np.array([float(i) for i in line[FIRST_TAXEL_POSITION:]])
+                self.skin_data[line[TIMESTAMP_POSITION]] = np.expand_dims(self.skin_data[line[TIMESTAMP_POSITION]], axis=0)
+
+    def load_data_in_2D(self):
+        with open(self.filepath) as data_file:
+            for line in data_file.readlines():
+                line = line.split()
+                self.skin_data[line[TIMESTAMP_POSITION]] = self.chunks(line[FIRST_TAXEL_POSITION:], 28)
+
+    def set_activity(self, activity):
+        self.activities = activity
+        self.tmp_changed = True
+        self.changed = True
+
+    def update(self):
+        self.tmp_changed = False
 
 def fullfield_sine_grating_orientation_tuning_protocol(
     model: Model,
@@ -38,6 +84,11 @@ def fullfield_sine_grating_orientation_tuning_protocol(
     If filename is not None it will save the collected data to file, filename
     """
     logger = setup_main_logger()
+    logger.info(f"skin = {skin}")
+    skin = InputSheetSkin(FILEPATH)
+    skin.load_data()
+    skin = list(skin.skin_data.values())
+    #logger.info(f"defskin = {skin}")
     if not load:
         responses = {}
 
@@ -57,22 +108,29 @@ def fullfield_sine_grating_orientation_tuning_protocol(
                     for sheet in model.sheets:
                         sheet.reset()
 
-                stim = SineGrating(
-                    orientation=numpy.pi / num_orientation * i,
-                    phase=numpy.pi * 2 / num_phase * j,
-                    xdensity=retina.unit_diameter,
-                    ydensity=retina.unit_diameter,
-                    frequency=frequency,
-                    scale=scale,
-                )()
+                # stim = SineGrating(
+                #     orientation=numpy.pi / num_orientation * i,
+                #     phase=numpy.pi * 2 / num_phase * j,
+                #     xdensity=retina.unit_diameter,
+                #     ydensity=retina.unit_diameter,
+                #     x=0,
+                #     y=0,
+                #     frequency=frequency,
+                #     scale=scale,
+                # )()
+                stim_number = random.randint(0, len(skin))
+                logger.info(f"stimnumber = {stim_number}")
+                stim = skin[stim_number]
+                logger.info(f"stim = {stim}")
                 retina.set_activity(stim)
+                logger.info(f"retina activity {str(responses)}")
                 model.run(duration)
                 for sheet in sheets:
                     responses[sheet.name][i, j, :] = (
                         sheet.get_activity(model.dt).copy().ravel()
                     )
 
-        logger.info(str(responses))
+        logger.info(f"responses {str(responses)}")
 
     # lets calculate the orientation preference and selectivity
     angles = [2 * numpy.pi / num_orientation * i for i in range(num_orientation)]

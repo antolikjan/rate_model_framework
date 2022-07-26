@@ -9,7 +9,6 @@ import pickle
 from imagen import SineGrating
 from typing import List
 
-from logger import setup_main_logger
 from rate_model import Model, InputSheet, HomeostaticSheet
 
 
@@ -29,14 +28,11 @@ def fullfield_sine_grating_orientation_tuning_protocol(
 ):
     """
     This analysis will present fullfield sine grating orientation tuning protocol to the model *model*.
-
     It will collect the final activation of neurons in sheets *sheets* (if None all sheets in the model are analyzed)
     and compute orientation tuning preference and
     selectivity for the neurons in these sheets.
-
     If filename is not None it will save the collected data to file, filename
     """
-    logger = setup_main_logger()
     if not load:
         responses = {}
 
@@ -70,7 +66,6 @@ def fullfield_sine_grating_orientation_tuning_protocol(
                     responses[sheet.name][i, j, :] = (
                         sheet.get_activity(model.dt).copy().ravel()
                     )
-                    logger.info("result ", f"{responses[sheet.name][i, j, :]}")
 
         if filename is not None:
             f = open(filename + "_resp.pickle", "wb")

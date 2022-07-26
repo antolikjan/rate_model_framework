@@ -69,11 +69,12 @@ import imagen.random
 import numbergen
 from imagen.transferfn import DivisiveNormalizeL1
 
-from analysis import *
+#from analysis import *
 from projections import *
 from rate_model import *
 from visualization import *
 import projections
+from skin_parser_analysis import fullfield_sine_grating_orientation_tuning_protocol
 
 
 if __name__ == "__main__":
@@ -83,6 +84,7 @@ if __name__ == "__main__":
 
     skin = InputSheetSkin(FILEPATH)
     skin.load_data()
+    #logger.info(f"skinity skin {list(skin.skin_data.values())}")
 
     retina = InputSheet("Retina", 2.4, 25, None)
     lgn_on = NoTimeConstantSheet("LGN_ON", 1.6, 25, None)
@@ -140,6 +142,7 @@ if __name__ == "__main__":
         fullfield_sine_grating_orientation_tuning_protocol(
             lissom,
             retina,
+            skin=list(skin.skin_data.values()),
             sheets=[V1],
             num_orientation=8,
             num_phase=10,
@@ -150,21 +153,21 @@ if __name__ == "__main__":
             plot=True,
             load=False,
         )
-        print("fig4")
-        pylab.figure()
-        fullfield_sine_grating_orientation_tuning_protocol(
-            lissom,
-            retina,
-            sheets=[V1],
-            num_orientation=8,
-            num_phase=10,
-            duration=0.02,
-            frequency=5.0,
-            filename="freq=5",
-            reset=True,
-            plot=True,
-            load=False,
-        )
+        # print("fig4")
+        # pylab.figure()
+        # fullfield_sine_grating_orientation_tuning_protocol(
+        #     lissom,
+        #     retina,
+        #     sheets=[V1],
+        #     num_orientation=8,
+        #     num_phase=10,
+        #     duration=0.02,
+        #     frequency=5.0,
+        #     filename="freq=5",
+        #     reset=True,
+        #     plot=True,
+        #     load=False,
+        # )
 
         print("fig5")
         pylab.show()
